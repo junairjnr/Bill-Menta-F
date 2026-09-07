@@ -1,0 +1,100 @@
+import { memo } from "react";
+import Link from "next/link";
+import type { DashboardTransaction, TransactionStatus } from "@/app/types/dashboard";
+import { TRANSACTION_STATUS } from "@/lib/Constant";
+import { adminType } from "@/lib/admin/typography";
+import DashboardCard from "./DashboardCard";
+
+interface RecentTransactionsTableProps {
+  title: string;
+  viewAllLabel: string;
+  viewAllHref: string;
+  columns: { key: string; label: string }[];
+  rows: DashboardTransaction[];
+}
+
+const STATUS_STYLES: Record<TransactionStatus, string> = {
+  [TRANSACTION_STATUS.COMPLETED]: "bg-emerald-50 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-400",
+  [TRANSACTION_STATUS.PENDING]: "bg-amber-50 text-amber-700 dark:bg-amber-500/15 dark:text-amber-400",
+  [TRANSACTION_STATUS.FAILED]: "bg-red-50 text-red-600 dark:bg-red-500/15 dark:text-red-400",
+};
+
+function StatusBadge({ status }: { status: TransactionStatus }) {
+  return (
+    <span
+      className={`inline-flex rounded-full px-2.5 py-0.5 capitalize ${adminType.badge} ${STATUS_STYLES[status]}`}
+    >
+      {status}
+    </span>
+  );
+}
+
+function RecentTransactionsTable({
+  title,
+  viewAllLabel,
+  viewAllHref,
+  columns,
+  rows,
+}: RecentTransactionsTableProps) {
+  return (
+    <DashboardCard
+      title={title}
+      headerRight={
+        <Link
+          href={viewAllHref}
+          className={`${adminType.badge} font-semibold text-emerald-800 hover:underline dark:text-emerald-400`}
+        >
+          {viewAllLabel}
+        </Link>
+      }
+      className="h-full"
+    >
+      <div className="w-full overflow-x-auto">
+        <table className={`admin-table w-full table-fixed text-left ${adminType.table}`}>
+          <thead>
+            <tr className="border-b border-border text-muted-foreground">
+              {columns.map((col) => (
+                <th
+                  key={col.key}
+                  className={`pb-3 pr-4 last:pr-0 ${adminType.tableHead} ${
+                    col.key === "id" ? "w-[18%]" : col.key === "client" ? "w-[28%]" : ""
+                  }`}
+                >
+                  {col.label}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {rows.length === 0 ? (
+              <tr>
+                <td colSpan={columns.length} className="py-6 text-center text-muted-foreground">
+                  No records found
+                </td>
+              </tr>
+            ) : (
+              rows.map((row) => (
+                <tr
+                  key={row.id}
+                  className="border-b border-border last:border-0 hover:bg-accent/50"
+                >
+                  <td className={`py-3.5 pr-4 font-mono ${adminType.badge} ${adminType.tableCellPrimary}`}>
+                    {row.id}
+                  </td>
+                  <td className={`py-3.5 pr-4 ${adminType.tableCellPrimary} truncate`}>{row.client}</td>
+                  <td className={`py-3.5 pr-4 ${adminType.label}`}>{row.date}</td>
+                  <td className="py-3.5 pr-4 font-semibold text-foreground">{row.amount}</td>
+                  <td className="py-3.5">
+                    <StatusBadge status={row.status} />
+                  </td>
+                </tr>
+              ))
+            )}
+          </tbody>
+        </table>
+      </div>
+    </DashboardCard>
+  );
+}
+
+export default memo(RecentTransactionsTable);
