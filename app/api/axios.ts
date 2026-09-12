@@ -6,7 +6,7 @@ import { tokenUtils } from "../utilsComponents/token";
 const API_BASE =
   process.env.NEXT_PUBLIC_API_URL?.replace(/\/$/, "") || "http://localhost:8080/api";
 // const API_BASE =
-//   process.env.NEXT_PUBLIC_API_URL?.replace(/\/$/, "") || "https://billing-app-b.onrender.com/api";
+//   process.env.NEXT_PUBLIC_API_URL?.replace(/\/$/, "") || "https://bill-menta-b.onrender.com/api";
 
 const axiosInstance = axios.create({
   baseURL: API_BASE,
