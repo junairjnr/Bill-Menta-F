@@ -41,7 +41,10 @@ const COLS = [
 
 const COL_COUNT = COLS.length;
 const rowValue = (row: StockReportRow) =>
-  row.stockValue ?? row.qty * (row.rate ?? row.avgCost ?? 0);
+  row.totalValue ??
+  (row.stockValue ?? row.qty * (row.rate ?? row.avgCost ?? 0)) +
+    (row.sgst ?? 0) +
+    (row.cgst ?? 0);
 
 export default function StockReportPage() {
   const [warehouseId, setWarehouseId] = useState("");
@@ -67,13 +70,19 @@ export default function StockReportPage() {
   const pageTotals = useMemo(
     () =>
       rows.reduce(
-        (acc, row) => ({
-          qty: acc.qty + (row.qty ?? 0),
-          sgst: acc.sgst + (row.sgst ?? 0),
-          cgst: acc.cgst + (row.cgst ?? 0),
-          value: acc.value + rowValue(row),
-        }),
-        { qty: 0, sgst: 0, cgst: 0, value: 0 }
+        (acc, row) => {
+          const taxable = row.stockValue ?? row.qty * (row.rate ?? row.avgCost ?? 0);
+          const sgst = row.sgst ?? 0;
+          const cgst = row.cgst ?? 0;
+          return {
+            qty: acc.qty + (row.qty ?? 0),
+            taxable: acc.taxable + taxable,
+            sgst: acc.sgst + sgst,
+            cgst: acc.cgst + cgst,
+            value: acc.value + (row.totalValue ?? taxable + sgst + cgst),
+          };
+        },
+        { qty: 0, taxable: 0, sgst: 0, cgst: 0, value: 0 }
       ),
     [rows]
   );
@@ -126,14 +135,9 @@ export default function StockReportPage() {
                 label: "Total Stock",
                 value: summary?.totalQty ?? pageTotals.qty,
               },
-              {
-                label: "SGST",
-                value: fmtMoney(summary?.totalSGST ?? pageTotals.sgst),
-              },
-              {
-                label: "CGST",
-                value: fmtMoney(summary?.totalCGST ?? pageTotals.cgst),
-              },
+              { label: "Taxable Value", value: fmtMoney(summary?.totalTaxable ?? pageTotals.taxable) },
+              { label: "SGST", value: fmtMoney(summary?.totalSGST ?? pageTotals.sgst) },
+              { label: "CGST", value: fmtMoney(summary?.totalCGST ?? pageTotals.cgst) },
               {
                 label: "Total Value",
                 value: fmtMoney(summary?.totalStockValue ?? pageTotals.value),

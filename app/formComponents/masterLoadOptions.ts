@@ -2,6 +2,7 @@ import { customerService } from "@/app/services/masterServices/customer/customer
 import { itemService } from "@/app/services/masterServices/item/item.service";
 import { itemCategoryService } from "@/app/services/masterServices/itemCategory/itemCategory.service";
 import { uomService } from "@/app/services/masterServices/uom/uom.service";
+import { taxMasterService } from "@/app/services/masterServices/taxMaster/taxMaster.service";
 import type { QueryParams, PaginatedData, Item } from "@/app/types";
 import { SELECT_PAGE_SIZE, toOption, type SelectOption } from "./selectTypes";
 
@@ -72,6 +73,14 @@ export async function loadUoms(search: string): Promise<SelectOption[]> {
   return searchOptions<import("@/app/types").Uom>(
     (params) => uomService.getAll(params),
     (u) => toOption(u._id, `${u.name} (${u.shortCode})`, u),
+    search
+  );
+}
+
+export async function loadTaxMasters(search: string): Promise<SelectOption[]> {
+  return searchOptions<import("@/app/types").TaxMaster>(
+    (params) => taxMasterService.getAll(params),
+    (t) => toOption(t._id, `${t.name} (${t.taxPercent}%)`, t),
     search
   );
 }

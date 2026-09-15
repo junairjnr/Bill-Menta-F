@@ -13,7 +13,7 @@ import { useCompanySettings } from "@/app/hooks/settingsHook/useSettings";
 import { printSalesReturnPdf } from "@/app/pdf/salesInvoice/printSalesReturn";
 import { amountInWords } from "@/app/utilsComponents/AmountInWords";
 import { printFooterButton } from "@/app/utilsComponents/form-footer";
-import { invoiceItemsTableClass } from "@/app/utilsComponents/report-ui";
+import { invoiceItemsTableClass, invoiceViewSummaryPanelClass, invoiceSummaryGrandTotalClass } from "@/app/utilsComponents/report-ui";
 
 const TABS = [
   { key: "return", label: "Return Info" },
@@ -202,7 +202,7 @@ export default function SalesReturnViewPage() {
 
         <ViewSection id="summary" title="Summary">
           <div className="flex justify-end">
-            <div className="w-full max-w-xs space-y-2 text-sm">
+            <div className={invoiceViewSummaryPanelClass}>
               <div className="flex justify-between border-b py-1.5 text-gray-600">
                 <span>Net Amount (Taxable Value)</span>
                 <span className="font-medium">₹ {ret.netAmount.toFixed(2)}</span>
@@ -230,7 +230,7 @@ export default function SalesReturnViewPage() {
                   {ret.roundOff.toFixed(2)}
                 </span>
               </div>
-              <div className="flex justify-between py-2 text-base font-bold text-gray-900">
+              <div className={invoiceSummaryGrandTotalClass}>
                 <span>Grand Total</span>
                 <span>₹ {ret.grandTotal.toFixed(2)}</span>
               </div>

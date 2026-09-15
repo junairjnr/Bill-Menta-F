@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Plus, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -27,7 +27,7 @@ import {
 } from "@/app/formComponents/masterLoadOptions";
 import { useInvoiceFormShortcuts } from "@/app/hooks/useInvoiceFormShortcuts";
 import InvoiceFormKeyboardHints from "@/app/utilsComponents/InvoiceFormKeyboardHints";
-import { invoiceItemsTableClass } from "@/app/utilsComponents/report-ui";
+import { invoiceItemsTableClass, invoiceSummaryPanelClass, invoiceSummaryGrandTotalClass } from "@/app/utilsComponents/report-ui";
 import InvoiceQuickAddModals, {
   getEntityId,
   type QuickAddModal,
@@ -36,6 +36,7 @@ import type { SelectOption } from "@/app/formComponents/selectTypes";
 import toast from "react-hot-toast";
 import NextDocumentNumberField from "@/app/formComponents/NextDocumentNumberField";
 import { itemSalesRate } from "@/app/utils/itemRates";
+import { useCompanySettings } from "@/app/hooks/settingsHook/useSettings";
 
 interface SalesReturnFormProps {
   onPendingChange?: (pending: boolean) => void;
@@ -59,10 +60,28 @@ type ManualLine = {
   key: string;
   itemId: string;
   itemName: string;
+  baseRate: number;
+  taxPercent: number;
   qty: string;
   rate: string;
   discount: string;
 };
+
+const calcManualLineTotals = (line: ManualLine) => {
+  const rate = Number(line.rate) || 0;
+  const qty = Number(line.qty) || 0;
+  const discount = Number(line.discount) || 0;
+  const grossAmt = Number((rate * qty).toFixed(2));
+  const discountAmt = Number(((grossAmt * discount) / 100).toFixed(2));
+  const taxableValue = Number((grossAmt - discountAmt).toFixed(2));
+  const sgst = Number(((taxableValue * 9) / 100).toFixed(2));
+  const cgst = Number(((taxableValue * 9) / 100).toFixed(2));
+  const total = Number((taxableValue + sgst + cgst).toFixed(2));
+  return { taxableValue, sgst, cgst, total };
+};
+
+const applyPriceLevelRate = (baseRate: number, priceLevelPct: number) =>
+  Number((baseRate + (baseRate * priceLevelPct) / 100).toFixed(2));
 
 const blockNeg = (e: React.KeyboardEvent<HTMLInputElement>) => {
   if (["-", "e", "E", "+"].includes(e.key)) e.preventDefault();
@@ -72,6 +91,8 @@ const newManualLine = (): ManualLine => ({
   key: `${Date.now()}-${Math.random()}`,
   itemId: "",
   itemName: "",
+  baseRate: 0,
+  taxPercent: 0,
   qty: "",
   rate: "",
   discount: "0",
@@ -93,6 +114,8 @@ export default function SalesReturnForm({ onPendingChange }: SalesReturnFormProp
   const [warehouseId, setWarehouseId] = useState("");
   const [salesType, setSalesType] = useState<"retail" | "wholesale">("retail");
   const [priceLevelId, setPriceLevelId] = useState("");
+  const [activePriceLevelPct, setActivePriceLevelPct] = useState(0);
+  const prevSalesTypeRef = useRef<"retail" | "wholesale" | null>(null);
   const [referenceInvoiceNo, setReferenceInvoiceNo] = useState("");
   const [manualLines, setManualLines] = useState<ManualLine[]>([newManualLine()]);
   const [quickAdd, setQuickAdd] = useState<QuickAddModal>(null);
@@ -105,6 +128,38 @@ export default function SalesReturnForm({ onPendingChange }: SalesReturnFormProp
   const { data: sourceInvoice } = useSalesInvoice(invoiceId);
   const { data: warehouseData } = useWarehouses({ limit: FORM_LOOKUP_LIMIT, isActive: true });
   const { data: priceLevelData } = usePriceLevels({ isActive: true });
+  const { data: companySettings } = useCompanySettings();
+
+  useEffect(() => {
+    const defaultType = companySettings?.defaultSalesType;
+    if (defaultType) setSalesType(defaultType);
+  }, [companySettings?._id, companySettings?.defaultSalesType]);
+
+  useEffect(() => {
+    if (prevSalesTypeRef.current === null) {
+      prevSalesTypeRef.current = salesType;
+      return;
+    }
+    if (prevSalesTypeRef.current === salesType) return;
+    prevSalesTypeRef.current = salesType;
+    setCustomerId("");
+    setCustomerOption(null);
+  }, [salesType]);
+
+  const manualTotals = useMemo(() => {
+    return manualLines.reduce(
+      (acc, line) => {
+        if (!line.itemId || !Number(line.qty)) return acc;
+        const row = calcManualLineTotals(line);
+        acc.netAmount += row.taxableValue;
+        acc.totalSGST += row.sgst;
+        acc.totalCGST += row.cgst;
+        acc.grandTotal += row.total;
+        return acc;
+      },
+      { netAmount: 0, totalSGST: 0, totalCGST: 0, grandTotal: 0 }
+    );
+  }, [manualLines]);
 
   const confirmedInvoices = useMemo(
     () => (invoiceList?.data ?? []).filter((inv) => inv.status === "confirmed"),
@@ -196,6 +251,21 @@ export default function SalesReturnForm({ onPendingChange }: SalesReturnFormProp
   const handleManualItemChange = (key: string, field: keyof ManualLine, value: string) => {
     setManualLines((prev) =>
       prev.map((line) => (line.key === key ? { ...line, [field]: value } : line))
+    );
+  };
+
+  const handlePriceLevelChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const id = e.target.value;
+    setPriceLevelId(id);
+    const pl = (priceLevelData?.data ?? []).find((p) => p._id === id);
+    const pct = Number(pl?.taxPercent ?? 0);
+    setActivePriceLevelPct(pct);
+    setManualLines((prev) =>
+      prev.map((line) => {
+        if (!line.baseRate) return line;
+        const rate = applyPriceLevelRate(line.baseRate, pct);
+        return { ...line, rate: String(rate) };
+      })
     );
   };
 
@@ -348,19 +418,28 @@ export default function SalesReturnForm({ onPendingChange }: SalesReturnFormProp
 
             {returnMode === "manual" && (
               <>
-                <FormSelect
-                  label="Sales Type"
-                  name="salesType"
-                  value={salesType}
-                  required
-                  enterNav
-                  options={[
-                    { label: "Retail", value: "retail" },
-                    { label: "Wholesale", value: "wholesale" },
-                  ]}
-                  onChange={(e) => setSalesType(e.target.value as "retail" | "wholesale")}
-                  onBlur={() => {}}
-                />
+                <div>
+                  <label className="mb-2 block text-sm font-medium text-gray-700">
+                    <span className="text-red-500">* </span>
+                    Sales Type
+                  </label>
+                  <div className="flex flex-wrap gap-2">
+                    {(["retail", "wholesale"] as const).map((type) => (
+                      <button
+                        key={type}
+                        type="button"
+                        onClick={() => setSalesType(type)}
+                        className={`rounded-md border px-4 py-2 text-sm font-medium transition ${
+                          salesType === type
+                            ? "border-[#1E2235] bg-[#1E2235] text-white"
+                            : "border-gray-300 bg-white text-gray-600 hover:bg-gray-50"
+                        }`}
+                      >
+                        {type === "retail" ? "Retail" : "Wholesale"}
+                      </button>
+                    ))}
+                  </div>
+                </div>
                 <FormInput
                   label="Original Invoice No"
                   name="referenceInvoiceNo"
@@ -439,7 +518,8 @@ export default function SalesReturnForm({ onPendingChange }: SalesReturnFormProp
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-x-16 gap-y-6">
               <FormSelectWithAdd
                 label="Customer"
-                instanceId="sales-return-customer"
+                instanceId={`sales-return-customer-${salesType}`}
+                reloadKey={salesType}
                 value={customerId}
                 selectedOption={customerOption}
                 required
@@ -475,7 +555,7 @@ export default function SalesReturnForm({ onPendingChange }: SalesReturnFormProp
                 enterNav
                 options={priceLevelOptions}
                 placeholder="Select price level..."
-                onChange={(e) => setPriceLevelId(e.target.value)}
+                onChange={handlePriceLevelChange}
                 onBlur={() => {}}
               />
             </div>
@@ -559,16 +639,24 @@ export default function SalesReturnForm({ onPendingChange }: SalesReturnFormProp
             <table className={invoiceItemsTableClass}>
               <thead className="bg-gray-50 text-gray-600 text-xs">
                 <tr>
+                  <th className="px-3 py-3 text-left w-10">#</th>
                   <th className="px-3 py-3 text-left min-w-[200px]">Item</th>
                   <th className="px-3 py-3 text-right w-24">Qty</th>
                   <th className="px-3 py-3 text-right w-28">Rate</th>
                   <th className="px-3 py-3 text-right w-24">Disc %</th>
+                  <th className="px-3 py-3 text-right w-28">Taxable</th>
+                  <th className="px-3 py-3 text-right w-24">SGST</th>
+                  <th className="px-3 py-3 text-right w-24">CGST</th>
+                  <th className="px-3 py-3 text-right w-28">Total</th>
                   <th className="px-3 py-3 w-10"></th>
                 </tr>
               </thead>
               <tbody>
-                {manualLines.map((line) => (
+                {manualLines.map((line, index) => {
+                  const rowTotals = calcManualLineTotals(line);
+                  return (
                   <tr key={line.key} className="border-t hover:bg-gray-50">
+                    <td className="px-3 py-2 text-gray-400 text-xs text-center">{index + 1}</td>
                     <td className="px-3 py-2">
                       <ItemSelectWithAdd
                         instanceId={`sales-return-item-${line.key}`}
@@ -581,7 +669,14 @@ export default function SalesReturnForm({ onPendingChange }: SalesReturnFormProp
                         }
                         loadOptions={loadItems}
                         onChange={(itemId, opt) => {
-                          const itemData = opt?.data as { price?: number; name?: string } | undefined;
+                          const itemData = opt?.data as {
+                            price?: number;
+                            salesRate?: number;
+                            name?: string;
+                            taxPercent?: number;
+                          } | undefined;
+                          const baseRate = itemSalesRate(itemData);
+                          const rate = applyPriceLevelRate(baseRate, activePriceLevelPct);
                           setManualLines((prev) =>
                             prev.map((l) =>
                               l.key === line.key
@@ -589,7 +684,9 @@ export default function SalesReturnForm({ onPendingChange }: SalesReturnFormProp
                                     ...l,
                                     itemId,
                                     itemName: opt?.label ?? "",
-                                    rate: l.rate || String(itemSalesRate(itemData) || ""),
+                                    baseRate,
+                                    taxPercent: Number(itemData?.taxPercent) || 0,
+                                    rate: String(rate || ""),
                                   }
                                 : l
                             )
@@ -641,6 +738,18 @@ export default function SalesReturnForm({ onPendingChange }: SalesReturnFormProp
                         className="w-full border-b border-gray-300 bg-transparent py-1 text-sm text-right outline-none focus:border-blue-600"
                       />
                     </td>
+                    <td className="px-3 py-2 text-right text-gray-600">
+                      ₹ {rowTotals.taxableValue.toFixed(2)}
+                    </td>
+                    <td className="px-3 py-2 text-right text-gray-600">
+                      ₹ {rowTotals.sgst.toFixed(2)}
+                    </td>
+                    <td className="px-3 py-2 text-right text-gray-600">
+                      ₹ {rowTotals.cgst.toFixed(2)}
+                    </td>
+                    <td className="px-3 py-2 text-right font-medium">
+                      ₹ {rowTotals.total.toFixed(2)}
+                    </td>
                     <td className="px-3 py-2 text-center">
                       <button
                         type="button"
@@ -654,9 +763,32 @@ export default function SalesReturnForm({ onPendingChange }: SalesReturnFormProp
                       </button>
                     </td>
                   </tr>
-                ))}
+                  );
+                })}
               </tbody>
             </table>
+            {manualTotals.grandTotal > 0 && (
+              <div className="border-t bg-gray-50 p-6 flex justify-end">
+                <div className={invoiceSummaryPanelClass}>
+                  <div className="flex justify-between text-gray-600">
+                    <span>Net Amount (Taxable Value)</span>
+                    <span>₹ {manualTotals.netAmount.toFixed(2)}</span>
+                  </div>
+                  <div className="flex justify-between text-gray-600">
+                    <span>Total SGST</span>
+                    <span>₹ {manualTotals.totalSGST.toFixed(2)}</span>
+                  </div>
+                  <div className="flex justify-between text-gray-600">
+                    <span>Total CGST</span>
+                    <span>₹ {manualTotals.totalCGST.toFixed(2)}</span>
+                  </div>
+                  <div className={invoiceSummaryGrandTotalClass}>
+                    <span>Grand Total</span>
+                    <span>₹ {manualTotals.grandTotal.toFixed(2)}</span>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         )}
 

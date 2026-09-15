@@ -125,8 +125,8 @@ export default function ShopReportPage() {
 
   return (
     <ReportShell
-      title="Shop Report"
-      description="Company ledger — sales, purchase, returns, receipts and payments"
+      title="Ledger Report"
+      description="Party ledger — sales, purchase, returns, receipts and payments"
       onClear={clear}
       activeFilterCount={activeFilterCount}
       exportType="shop-report"

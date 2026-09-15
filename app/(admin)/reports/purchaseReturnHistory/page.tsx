@@ -86,7 +86,9 @@ export default function PurchaseReturnHistoryPage() {
           ? [
               { label: "Total Returns", value: summary.totalReturns },
               { label: "Total Qty", value: summary.totalQty },
-              { label: "Taxable", value: fmtMoney(summary.totalTaxable) },
+              { label: "Total Taxable", value: fmtMoney(summary.totalTaxable) },
+              { label: "SGST", value: fmtMoney(summary.totalSGST ?? 0) },
+              { label: "CGST", value: fmtMoney(summary.totalCGST ?? 0) },
               { label: "Total Value", value: fmtMoney(summary.totalValue), highlight: true },
             ]
           : undefined

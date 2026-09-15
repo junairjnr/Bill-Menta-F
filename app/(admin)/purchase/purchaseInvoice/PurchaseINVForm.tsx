@@ -687,14 +687,31 @@ import { colors } from "@/app/utilsComponents/Colors";
 import { PURCHASE_INVOICE_FORM_ID } from "@/app/utilsComponents/form-footer";
 import { useInvoiceFormShortcuts } from "@/app/hooks/useInvoiceFormShortcuts";
 import InvoiceFormKeyboardHints from "@/app/utilsComponents/InvoiceFormKeyboardHints";
-import { invoiceItemsTableClass } from "@/app/utilsComponents/report-ui";
+import { invoiceItemsTableClass, invoiceSummaryPanelClass, invoiceSummaryGrandTotalClass } from "@/app/utilsComponents/report-ui";
 import { focusEnterNavField } from "@/app/utilsComponents/invoiceFormUtils";
 import NextDocumentNumberField from "@/app/formComponents/NextDocumentNumberField";
 import DocumentAttachmentsField from "@/app/utilsComponents/DocumentAttachments";
 import type { DocumentAttachment } from "@/app/types";
 import { itemPurchaseRate } from "@/app/utils/itemRates";
+import toast from "react-hot-toast";
+import InvoicePaymentDetailsForm, {
+  emptyInvoicePaymentRow,
+  resolvePaymentsForSubmit,
+  resolveReceivedPaidAmount,
+  sumInvoicePayments,
+  type InvoicePaymentFormRow,
+} from "@/app/utilsComponents/InvoicePaymentDetailsForm";
+import {
+  InvoicePaymentAccountSelect,
+  InvoicePaymentMethodSelect,
+} from "@/app/utilsComponents/invoicePaymentFields";
+import { DEFAULT_INVOICE_PAYMENT_MODE, needsBankAccount } from "@/app/utilsComponents/paymentConstants";
 
 // ── Empty item row ────────────────────────────────────────────
+const blockNeg = (e: React.KeyboardEvent<HTMLInputElement>) => {
+  if (["-", "e", "E", "+"].includes(e.key)) e.preventDefault();
+};
+
 const emptyRow = () => ({
   itemId: "",
   itemName: "",
@@ -769,6 +786,9 @@ export default function PurchaseInvoiceForm({
   const [productRowIndex, setProductRowIndex] = useState<number | null>(null);
   const [vendorOption, setVendorOption] = useState<SelectOption | null>(null);
   const [attachments, setAttachments] = useState<DocumentAttachment[]>([]);
+  const [payments, setPayments] = useState<InvoicePaymentFormRow[]>([
+    emptyInvoicePaymentRow(DEFAULT_INVOICE_PAYMENT_MODE),
+  ]);
   const pushRowRef = useRef<(() => void) | null>(null);
 
   const {
@@ -804,6 +824,11 @@ export default function PurchaseInvoiceForm({
             return true;
           }),
         warehouseId: Yup.string().required("Warehouse is required"),
+        paidAmount: Yup.number()
+          .transform((_v, orig) =>
+            orig === "" || orig == null ? 0 : Number(orig)
+          )
+          .min(0, "Cannot be negative"),
         items: Yup.array()
           .of(
             Yup.object({
@@ -829,13 +854,53 @@ export default function PurchaseInvoiceForm({
       purchaseDate: today,
       warehouseId: "",
       notes: "",
+      paidAmount: "",
+      paymentMethod: DEFAULT_INVOICE_PAYMENT_MODE,
+      paymentBankAccountId: "",
       items: [emptyRow()], // ← items inside formik
     },
 
     validationSchema,
 
     onSubmit: (values) => {
-      console.log(values, "values");
+      const invoiceGrandTotal = Math.round(
+        values.items.reduce((s, r) => s + r.taxableValue, 0) +
+          values.items.reduce((s, r) => s + r.sgst, 0) +
+          values.items.reduce((s, r) => s + r.cgst, 0)
+      );
+      const paidAmount = resolveReceivedPaidAmount(
+        invoiceGrandTotal,
+        values.paidAmount,
+        "credit"
+      );
+      const splitTotal = sumInvoicePayments(payments);
+      const paymentLines = resolvePaymentsForSubmit(
+        payments,
+        paidAmount,
+        values.paymentMethod,
+        values.paymentBankAccountId
+      );
+
+      if (paidAmount > invoiceGrandTotal + 0.009) {
+        toast.error("Paid amount cannot exceed invoice total");
+        return;
+      }
+      if (splitTotal > paidAmount + 0.009) {
+        toast.error("Payment split cannot exceed paid amount");
+        return;
+      }
+      if (splitTotal > 0 && splitTotal < paidAmount - 0.009) {
+        toast.error("Payment split must equal paid amount");
+        return;
+      }
+
+      for (const line of paymentLines) {
+        if (needsBankAccount(line.paymentMode) && !line.bankAccountId) {
+          toast.error("Select a bank account for bank/UPI payments");
+          return;
+        }
+      }
+
       const payload = {
         vendorId: values.vendorId,
         vendorInvoiceNo: values.vendorInvoiceNo,
@@ -843,6 +908,8 @@ export default function PurchaseInvoiceForm({
         warehouseId: values.warehouseId,
         notes: values.notes,
         attachments,
+        paidAmount,
+        ...(paidAmount > 0 && paymentLines.length ? { payments: paymentLines } : {}),
         items: values.items.map((r, i) => ({
           slNo: i + 1,
           itemId: r.itemId,
@@ -859,7 +926,6 @@ export default function PurchaseInvoiceForm({
           total: r.total,
         })),
       };
-      console.log(payload, "payloa");
       create(payload, {
         onSuccess: () => router.push("/purchase/purchaseInvoice"),
       });
@@ -958,6 +1024,12 @@ export default function PurchaseInvoiceForm({
   const total = netAmount + totalTax;
   const grandTotal = Math.round(total);
   const roundOff = Number((grandTotal - total).toFixed(2));
+  const paidAmount = resolveReceivedPaidAmount(
+    grandTotal,
+    values.paidAmount,
+    "credit"
+  );
+  const balanceDue = Number((grandTotal - paidAmount).toFixed(2));
 
   return (
     <FormikProvider value={formik}>
@@ -1029,6 +1101,28 @@ export default function PurchaseInvoiceForm({
                 addLabel="Add Warehouse"
                 onAddClick={() => setQuickAdd("warehouse")}
               />
+
+              <InvoicePaymentMethodSelect
+                name="paymentMethod"
+                value={values.paymentMethod}
+                onChange={(e) => {
+                  handleChange(e);
+                  if (!needsBankAccount(e.target.value)) {
+                    setFieldValue("paymentBankAccountId", "");
+                  }
+                }}
+                onBlur={handleBlur}
+              />
+
+              {needsBankAccount(values.paymentMethod) && (
+                <InvoicePaymentAccountSelect
+                  paymentMode={values.paymentMethod}
+                  name="paymentBankAccountId"
+                  value={values.paymentBankAccountId}
+                  onChange={handleChange}
+                  onBlur={handleBlur}
+                />
+              )}
             </div>
           </div>
 
@@ -1365,8 +1459,15 @@ export default function PurchaseInvoiceForm({
             </FieldArray>
 
             {/* ── Summary ───────────────────────────────────── */}
-            <div className="flex justify-end p-6 border-t bg-gray-50">
-              <div className="w-full max-w-xs space-y-2 text-sm">
+            <div className="flex flex-col gap-6 border-t bg-gray-50 p-6 lg:flex-row lg:items-start lg:justify-between">
+              <InvoicePaymentDetailsForm
+                grandTotal={grandTotal}
+                receivedAmount={paidAmount}
+                payments={payments}
+                onPaymentsChange={setPayments}
+                receivedLabel="Paid"
+              />
+              <div className={invoiceSummaryPanelClass}>
                 <div className="flex justify-between text-gray-600">
                   <span>Net Amount</span>
                   <span>₹ {netAmount.toFixed(2)}</span>
@@ -1400,10 +1501,40 @@ export default function PurchaseInvoiceForm({
                   </span>
                 </div>
 
-                <div className="flex justify-between font-bold text-gray-900 text-base border-t pt-2">
+                <div className={invoiceSummaryGrandTotalClass}>
                   <span>Grand Total</span>
                   <span>₹ {grandTotal.toFixed(2)}</span>
                 </div>
+
+                <div className="rounded-lg border border-emerald-200 bg-emerald-50/80 px-3 py-2.5">
+                  <div className="flex justify-between items-center gap-3">
+                    <span className="text-sm font-semibold text-emerald-900">
+                      Paid Amount
+                    </span>
+                    <input
+                      type="number"
+                      name="paidAmount"
+                      value={values.paidAmount}
+                      onChange={handleChange}
+                      onBlur={handleBlur}
+                      onKeyDown={blockNeg}
+                      min="0"
+                      step="0.01"
+                      placeholder="0"
+                      className="w-32 rounded-md border border-emerald-300 bg-white px-2 py-1.5 text-sm font-semibold text-right text-emerald-900 outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-200"
+                    />
+                  </div>
+                  <p className="mt-1 text-xs text-emerald-800">
+                    Leave empty for full amount on credit (payable).
+                  </p>
+                </div>
+
+                {balanceDue > 0 && (
+                  <div className="flex justify-between text-orange-600 font-medium">
+                    <span>Balance Payable</span>
+                    <span>₹ {balanceDue.toFixed(2)}</span>
+                  </div>
+                )}
 
                 <p className="text-gray-400 text-xs italic pt-1">
                   {amountInWords(grandTotal)}

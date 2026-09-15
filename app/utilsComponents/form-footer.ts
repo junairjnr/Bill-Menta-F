@@ -6,6 +6,7 @@ export const PRODUCT_FORM_ID = "product-form";
 export const CATEGORY_FORM_ID = "category-form";
 export const CUSTOMER_FORM_ID = "customer-form";
 export const PRICE_LEVEL_FORM_ID = "price-level-form";
+export const TAX_MASTER_FORM_ID = "tax-master-form";
 export const WAREHOUSE_FORM_ID = "warehouse-form";
 export const BANK_FORM_ID = "bank-form";
 export const BRANCH_FORM_ID = "branch-form";
@@ -166,6 +167,29 @@ export function priceLevelFormFooterButtons({
       label: isPending ? "Saving..." : isEdit ? "Update Price Level" : "Save Price Level",
       type: "submit",
       form: PRICE_LEVEL_FORM_ID,
+      disabled: isPending,
+      className: primaryBtn,
+    },
+  ];
+}
+
+export function taxMasterFormFooterButtons({
+  isEdit = false,
+  isPending = false,
+  onCancel,
+}: FormFooterOptions): FooterButton[] {
+  return [
+    {
+      label: "Cancel",
+      variant: "outline",
+      disabled: isPending,
+      onClick: onCancel,
+      className: cancelBtn,
+    },
+    {
+      label: isPending ? "Saving..." : isEdit ? "Update Tax Master" : "Save Tax Master",
+      type: "submit",
+      form: TAX_MASTER_FORM_ID,
       disabled: isPending,
       className: primaryBtn,
     },

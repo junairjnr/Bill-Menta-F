@@ -61,7 +61,7 @@ export default function LedgerReportPage() {
 
   return (
     <ReportShell
-      title="Ledger Report"
+      title="Stock Ledger Report"
       description="Stock movement history per item"
       onClear={clear}
       activeFilterCount={activeFilterCount}

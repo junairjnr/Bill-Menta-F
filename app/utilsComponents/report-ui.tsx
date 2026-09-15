@@ -16,6 +16,14 @@ export const fmtDate = (d: string) =>
 
 export const fmtMoney = (n: number) => `₹ ${n.toFixed(2)}`;
 
+/** Invoice / return summary panel (forms + view pages) */
+export const invoiceSummaryPanelClass =
+  "w-full min-w-[280px] max-w-md space-y-2.5 text-base lg:ml-auto";
+export const invoiceViewSummaryPanelClass =
+  "w-full min-w-[280px] max-w-md space-y-2.5 text-base";
+export const invoiceSummaryGrandTotalClass =
+  "flex justify-between py-2 text-lg font-bold text-gray-900 border-t pt-2";
+
 export function reportRowClass(index: number, extra?: string) {
   return cn(
     "border-b border-gray-50 transition-colors hover:bg-gray-100/60",

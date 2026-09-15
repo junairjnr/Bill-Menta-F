@@ -8,7 +8,7 @@ import ViewField from "@/app/utilsComponents/ViewField";
 import { usePurchaseInvoice } from "@/app/hooks/purchaseHooks/usePurchaseInvoice";
 import { amountInWords } from "@/app/utilsComponents/AmountInWords";
 import { footerReturnBtn, printFooterButton } from "@/app/utilsComponents/form-footer";
-import { invoiceItemsTableClass } from "@/app/utilsComponents/report-ui";
+import { invoiceItemsTableClass, invoiceViewSummaryPanelClass, invoiceSummaryGrandTotalClass } from "@/app/utilsComponents/report-ui";
 import { DocumentAttachmentsView } from "@/app/utilsComponents/DocumentAttachments";
 
 const TABS = [
@@ -184,7 +184,7 @@ export default function PurchaseViewPage() {
 
         <ViewSection id="summary" title="Summary">
           <div className="flex justify-end">
-            <div className="w-full max-w-xs space-y-2 text-sm">
+            <div className={invoiceViewSummaryPanelClass}>
               <div className="flex justify-between border-b py-1.5 text-gray-600">
                 <span>Net Amount</span>
                 <span className="font-medium">₹ {invoice.netAmount.toFixed(2)}</span>
@@ -212,7 +212,7 @@ export default function PurchaseViewPage() {
                   {invoice.roundOff.toFixed(2)}
                 </span>
               </div>
-              <div className="flex justify-between py-2 text-base font-bold text-gray-900">
+              <div className={invoiceSummaryGrandTotalClass}>
                 <span>Grand Total</span>
                 <span>₹ {invoice.grandTotal.toFixed(2)}</span>
               </div>

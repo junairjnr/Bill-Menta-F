@@ -19,6 +19,7 @@ import {
   Building2,
   BookOpen,
   Scale,
+  Percent,
   PieChart,
   UserCog,
 } from "lucide-react";
@@ -87,6 +88,12 @@ export const sections: Section[] = [
             path: "/master/priceLevel",
             icon: <Boxes size={16} />,
             permissionKey: "master.priceLevel",
+          },
+          {
+            name: "Tax Master",
+            path: "/master/taxMaster",
+            icon: <Percent size={16} />,
+            permissionKey: "master.taxMaster",
           },
           {
             name: "Branch",
@@ -163,10 +170,10 @@ export const sections: Section[] = [
     ],
   },
   {
-    title: "RECEIPT / PAYMENT",
+    title: "VOUCHERS",
     items: [
       {
-        name: "Receipt & Payment",
+        name: "Vouchers",
         icon: <Wallet size={18} />,
         subMenu: [
           {
@@ -250,6 +257,18 @@ export const sections: Section[] = [
             path: "/reports/salesHistory",
             icon: <FileText size={16} />,
             permissionKey: "reports.salesHistory",
+          },
+          {
+            name: "Sales Return Report",
+            path: "/reports/salesReturnReport",
+            icon: <ShoppingCart size={16} />,
+            permissionKey: "reports.salesReturnHistory",
+          },
+          {
+            name: "Purchase Return Report",
+            path: "/reports/purchaseReturnReport",
+            icon: <ClipboardList size={16} />,
+            permissionKey: "reports.purchaseReturnHistory",
           },
           {
             name: "Sales Return History",

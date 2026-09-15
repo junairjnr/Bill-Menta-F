@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { Suspense, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { useCustomers } from "@/app/hooks/masterHooks/customerHook/useCustomer";
 import { useSubLedger } from "@/app/hooks/accountingHook/useAccounting";
@@ -26,7 +26,7 @@ const COLS = [
   { label: "Balance", align: "right" as const },
 ];
 
-export default function SubLedgersPage() {
+function SubLedgersContent() {
   const searchParams = useSearchParams();
   const initialType = searchParams.get("partyType") === "vendor" ? "vendor" : "customer";
   const initialId = searchParams.get("partyId") || "";
@@ -34,6 +34,13 @@ export default function SubLedgersPage() {
 
   const [partyType, setPartyType] = useState<"customer" | "vendor">(initialType);
   const [partyId, setPartyId] = useState(initialId);
+
+  useEffect(() => {
+    const nextType = searchParams.get("partyType") === "vendor" ? "vendor" : "customer";
+    const nextId = searchParams.get("partyId") || "";
+    setPartyType(nextType);
+    setPartyId(nextId);
+  }, [searchParams]);
 
   const { data: customerData } = useCustomers({ limit: DROPDOWN_LIMIT });
   const parties = useMemo(() => {
@@ -93,6 +100,9 @@ export default function SubLedgersPage() {
                   value: p._id,
                   label: p.name,
                 })),
+                ...(partyId && !parties.some((p: { _id: string }) => p._id === partyId)
+                  ? [{ value: partyId, label: initialName || partyId }]
+                  : []),
               ]}
             />
           </FilterField>
@@ -108,6 +118,11 @@ export default function SubLedgersPage() {
             loading={isLoading}
             error={isError}
             empty={!isLoading && !isError && rows.length === 0}
+            message={
+              !isLoading && !isError && rows.length === 0
+                ? "No journal entries found for this party"
+                : undefined
+            }
           />
         ) : (
           rows.map((row, i) => (
@@ -124,5 +139,13 @@ export default function SubLedgersPage() {
         )}
       </ReportTable>
     </ReportShell>
+  );
+}
+
+export default function SubLedgersPage() {
+  return (
+    <Suspense fallback={<div className="p-6 text-sm text-gray-500">Loading sub-ledger...</div>}>
+      <SubLedgersContent />
+    </Suspense>
   );
 }

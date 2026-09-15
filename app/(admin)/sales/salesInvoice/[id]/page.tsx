@@ -21,7 +21,7 @@ import {
   footerReturnBtn,
   printFooterButton,
 } from "@/app/utilsComponents/form-footer";
-import { invoiceItemsTableClass } from "@/app/utilsComponents/report-ui";
+import { invoiceItemsTableClass, invoiceViewSummaryPanelClass, invoiceSummaryGrandTotalClass } from "@/app/utilsComponents/report-ui";
 import {
   PAYMENT_STATUS_LABELS,
   PAYMENT_STATUS_STYLES,
@@ -361,7 +361,7 @@ export default function SalesInvoiceViewPage() {
 
         <ViewSection id="summary" title="Summary">
           <div className="flex justify-end">
-            <div className="w-full max-w-xs space-y-2 text-sm">
+            <div className={invoiceViewSummaryPanelClass}>
               <div className="flex justify-between border-b py-1.5 text-gray-600">
                 <span>Subtotal (Taxable Value)</span>
                 <span className="font-medium">₹ {lineNetAmount.toFixed(2)}</span>
@@ -412,7 +412,7 @@ export default function SalesInvoiceViewPage() {
                   <span>- ₹ {cashDiscountAmt.toFixed(2)}</span>
                 </div>
               )}
-              <div className="flex justify-between py-2 text-base font-bold text-gray-900">
+              <div className={invoiceSummaryGrandTotalClass}>
                 <span>Amount to Collect</span>
                 <span>₹ {invoice.grandTotal.toFixed(2)}</span>
               </div>

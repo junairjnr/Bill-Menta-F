@@ -157,14 +157,19 @@ const exportRegistry: Record<string, ExportConfig> = {
           rate: fmtExportMoney(row.rate ?? row.avgCost ?? 0),
           sgst: fmtExportMoney(row.sgst ?? 0),
           cgst: fmtExportMoney(row.cgst ?? 0),
-          stockValue: fmtExportMoney(row.stockValue ?? row.qty * (row.rate ?? row.avgCost ?? 0)),
+          stockValue: fmtExportMoney(
+            row.totalValue ??
+              (row.stockValue ?? row.qty * (row.rate ?? row.avgCost ?? 0)) +
+                (row.sgst ?? 0) +
+                (row.cgst ?? 0)
+          ),
         }),
         options
       ),
   },
 
   "ledger-report": {
-    title: "Ledger Report",
+    title: "Stock Ledger Report",
     columns: [
       defineCol("slno", "Sl No"),
       defineCol("date", "Date"),
@@ -217,7 +222,7 @@ const exportRegistry: Record<string, ExportConfig> = {
   },
 
   "shop-report": {
-    title: "Shop Report",
+    title: "Ledger Report",
     columns: [
       defineCol("slno", "Sl No"),
       defineCol("date", "Date"),
@@ -370,6 +375,74 @@ const exportRegistry: Record<string, ExportConfig> = {
         qty: String(row.qty),
         rate: fmtExportMoney(row.rate),
         total: fmtExportMoney(row.total),
+      })
+    ),
+  },
+
+  "sales-return-report": {
+    title: "Sales Return Report",
+    columns: [
+      defineCol("slno", "Sl No"),
+      defineCol("returnNo", "Return No"),
+      defineCol("returnDate", "Date"),
+      defineCol("salesType", "Type"),
+      defineCol("customer", "Customer"),
+      defineCol("originalInvoiceNo", "Original Invoice"),
+      defineCol("netAmount", "Net Amount", { align: "right" }),
+      defineCol("sgst", "SGST", { align: "right" }),
+      defineCol("cgst", "CGST", { align: "right" }),
+      defineCol("grandTotal", "Grand Total", { align: "right" }),
+      defineCol("status", "Status"),
+    ],
+    fetchRows: paginatedReportFetcher(
+      (p) => reportsService.getSalesReturnReport(p),
+      (row) => ({
+        returnNo: row.returnNo,
+        returnDate: fmtExportDate(row.returnDate),
+        salesType: row.salesType,
+        customer:
+          typeof row.customerId === "object"
+            ? row.customerId.name
+            : row.customerSnapshot?.name ?? "",
+        originalInvoiceNo: row.originalInvoiceNo ?? "",
+        netAmount: fmtExportMoney(row.netAmount),
+        sgst: fmtExportMoney(row.totalSGST),
+        cgst: fmtExportMoney(row.totalCGST),
+        grandTotal: fmtExportMoney(row.grandTotal),
+        status: row.status,
+      })
+    ),
+  },
+
+  "purchase-return-report": {
+    title: "Purchase Return Report",
+    columns: [
+      defineCol("slno", "Sl No"),
+      defineCol("returnNo", "Return No"),
+      defineCol("returnDate", "Date"),
+      defineCol("vendor", "Vendor"),
+      defineCol("originalInvoiceNo", "Original Invoice"),
+      defineCol("netAmount", "Net Amount", { align: "right" }),
+      defineCol("sgst", "SGST", { align: "right" }),
+      defineCol("cgst", "CGST", { align: "right" }),
+      defineCol("grandTotal", "Grand Total", { align: "right" }),
+      defineCol("status", "Status"),
+    ],
+    fetchRows: paginatedReportFetcher(
+      (p) => reportsService.getPurchaseReturnReport(p),
+      (row) => ({
+        returnNo: row.returnNo,
+        returnDate: fmtExportDate(row.returnDate),
+        vendor:
+          typeof row.vendorId === "object"
+            ? row.vendorId.name
+            : row.vendorSnapshot?.name ?? "",
+        originalInvoiceNo: row.originalInvoiceNo ?? "",
+        netAmount: fmtExportMoney(row.netAmount),
+        sgst: fmtExportMoney(row.totalSGST),
+        cgst: fmtExportMoney(row.totalCGST),
+        grandTotal: fmtExportMoney(row.grandTotal),
+        status: row.status,
       })
     ),
   },

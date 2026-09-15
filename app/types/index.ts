@@ -159,6 +159,7 @@ export interface CompanySettings {
   terms?: string;
   logo?: string;
   plan?: "free" | "pro" | "enterprise";
+  defaultSalesType?: "retail" | "wholesale";
   isActive?: boolean;
 }
 
@@ -240,6 +241,7 @@ export interface Item {
   purchaseRate?: number;
   price: number;
   taxPercent: number;
+  taxMasterId?: string | { _id: string; name: string; taxPercent: number };
   categoryId: {
     _id: string;
     name: string;
@@ -257,6 +259,7 @@ export interface CreateItemPayload {
   purchaseRate: number;
   price: number; // kept in sync with salesRate for backward compatibility
   taxPercent: number; // ← number not string
+  taxMasterId?: string;
   categoryId: string; // ← string (ObjectId) not number
   uomId: string; // ← string (ObjectId)
   description?: string;
@@ -328,6 +331,23 @@ export interface PriceLevel {
 export interface CreatePriceLevelPayload {
   name: string;
   taxPercent?: string;
+  isActive: boolean;
+}
+
+// TAX MASTER
+
+export interface TaxMaster {
+  _id: string;
+  name: string;
+  taxPercent: number;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CreateTaxMasterPayload {
+  name: string;
+  taxPercent: number;
   isActive: boolean;
 }
 
@@ -424,6 +444,13 @@ export interface PurchaseItemRow {
   total: number;
 }
 
+export interface InvoicePaymentLine {
+  paymentMode: string;
+  bankAccountId?: string;
+  amount: number | string;
+  referenceNo?: string;
+}
+
 export interface CreatePurchasePayload {
   vendorId: string;
   vendorInvoiceNo: string;
@@ -432,6 +459,8 @@ export interface CreatePurchasePayload {
   items: PurchaseItem[];
   notes?: string;
   attachments?: DocumentAttachment[];
+  payments?: InvoicePaymentLine[];
+  paidAmount?: number;
 }
 
 export interface PurchaseInvoice {
@@ -554,6 +583,7 @@ export interface CreateSalesPayload {
   cashDiscountAmt?: number;
   saleMode?: "credit" | "cash";
   paidAmount?: number;
+  payments?: InvoicePaymentLine[];
 }
 
 // ── Purchase Return ───────────────────────────────────────────
@@ -924,11 +954,13 @@ export interface StockReportRow {
   stockValue: number;
   sgst: number;
   cgst: number;
+  totalValue?: number;
 }
 
 export interface StockReportSummary {
   totalItems: number;
   totalStockValue: number;
+  totalTaxable?: number;
   totalQty?: number;
   totalSGST?: number;
   totalCGST?: number;
@@ -1193,6 +1225,57 @@ export interface PurchaseReturnHistorySummary {
   totalSGST?: number;
   totalCGST?: number;
   avgRate: number;
+}
+
+export interface SalesReturnReportRow {
+  _id: string;
+  returnNo: string;
+  returnDate: string;
+  salesType: string;
+  customerId: { _id: string; name: string } | string;
+  customerSnapshot?: { name: string };
+  originalInvoiceNo?: string;
+  netAmount: number;
+  totalSGST: number;
+  totalCGST: number;
+  totalTax: number;
+  grandTotal: number;
+  status: string;
+}
+
+export interface SalesReturnReportSummary {
+  totalReturns: number;
+  retailCount: number;
+  wholesaleCount: number;
+  totalNetAmount: number;
+  totalSGST: number;
+  totalCGST: number;
+  totalTax: number;
+  grandTotal: number;
+}
+
+export interface PurchaseReturnReportRow {
+  _id: string;
+  returnNo: string;
+  returnDate: string;
+  vendorId: { _id: string; name: string } | string;
+  vendorSnapshot?: { name: string };
+  originalInvoiceNo?: string;
+  netAmount: number;
+  totalSGST: number;
+  totalCGST: number;
+  totalTax: number;
+  grandTotal: number;
+  status: string;
+}
+
+export interface PurchaseReturnReportSummary {
+  totalReturns: number;
+  totalNetAmount: number;
+  totalSGST: number;
+  totalCGST: number;
+  totalTax: number;
+  grandTotal: number;
 }
 
 // ── Expense ───────────────────────────────────────────────────

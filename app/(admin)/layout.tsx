@@ -52,16 +52,16 @@ export default function DomainLayout({
 
   return (
     <div className="h-screen w-full flex overflow-hidden">
-      <div className="h-full overflow-hidden bg-white shadow shrink-0">
+      <div className="h-full overflow-hidden bg-[#1E2235] shadow-lg shrink-0">
         <Sidebar />
       </div>
 
-      <div className="flex flex-col flex-1 overflow-hidden">
-        <div className="h-16 shrink-0 shadow bg-white z-50">
+      <div className="flex flex-col flex-1 overflow-hidden admin-shell-bg">
+        <div className="h-16 shrink-0 shadow-md bg-[#1E2235] border-b border-white/5 z-50">
           <Navbar />
         </div>
 
-        <main className="flex-1 overflow-y-auto p-2">
+        <main className="flex-1 overflow-y-auto p-2 admin-shell-bg">
           <PermissionGuard>{children}</PermissionGuard>
         </main>
       </div>

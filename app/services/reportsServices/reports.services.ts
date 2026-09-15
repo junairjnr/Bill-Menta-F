@@ -20,6 +20,10 @@ import {
   SalesReturnHistorySummary,
   PurchaseReturnHistoryRow,
   PurchaseReturnHistorySummary,
+  SalesReturnReportRow,
+  SalesReturnReportSummary,
+  PurchaseReturnReportRow,
+  PurchaseReturnReportSummary,
   ExpenseReportRow,
   ExpenseReportSummary,
 } from "../../types/index";
@@ -216,6 +220,37 @@ export const reportsService = {
         summary: ExpenseReportSummary;
       }>
     >("/reports/expense", { params });
+    return res.data.data;
+  },
+
+  getSalesReturnReport: async (params?: {
+    dateFrom?: string;
+    dateTo?: string;
+    customerId?: string;
+    salesType?: string;
+    warehouseId?: string;
+    status?: string;
+    page?: number;
+    limit?: number;
+  }) => {
+    const res = await axiosInstance.get<
+      ApiResponse<ReportResponse<SalesReturnReportRow, SalesReturnReportSummary>>
+    >("/reports/sales-return", { params });
+    return res.data.data;
+  },
+
+  getPurchaseReturnReport: async (params?: {
+    dateFrom?: string;
+    dateTo?: string;
+    vendorId?: string;
+    warehouseId?: string;
+    status?: string;
+    page?: number;
+    limit?: number;
+  }) => {
+    const res = await axiosInstance.get<
+      ApiResponse<ReportResponse<PurchaseReturnReportRow, PurchaseReturnReportSummary>>
+    >("/reports/purchase-return", { params });
     return res.data.data;
   },
 };

@@ -40,6 +40,10 @@ const EditProduct = () => {
               purchaseRate: itemPurchaseRate(data) || "",
               price: itemSalesRate(data) || "",
               taxPercent: data?.taxPercent,
+              taxMasterId:
+                typeof data?.taxMasterId === "object"
+                  ? data.taxMasterId._id
+                  : data?.taxMasterId ?? "",
               categoryId: data?.categoryId._id,
               uomId: data?.uomId?._id,
               description: data.description ?? "",

@@ -34,7 +34,7 @@ import FormInput from "../../../formComponents/FormText";
 import FormDateInput from "../../../formComponents/FormDate";
 import { useInvoiceFormShortcuts } from "@/app/hooks/useInvoiceFormShortcuts";
 import InvoiceFormKeyboardHints from "@/app/utilsComponents/InvoiceFormKeyboardHints";
-import { invoiceItemsTableClass } from "@/app/utilsComponents/report-ui";
+import { invoiceItemsTableClass, invoiceSummaryPanelClass, invoiceSummaryGrandTotalClass } from "@/app/utilsComponents/report-ui";
 import { focusEnterNavField } from "@/app/utilsComponents/invoiceFormUtils";
 import NextDocumentNumberField from "@/app/formComponents/NextDocumentNumberField";
 import {
@@ -45,6 +45,20 @@ import {
   stateCodeFromGstin,
 } from "@/app/utils/gstTax";
 import { itemSalesRate } from "@/app/utils/itemRates";
+import { useCompanySettings } from "@/app/hooks/settingsHook/useSettings";
+import toast from "react-hot-toast";
+import InvoicePaymentDetailsForm, {
+  emptyInvoicePaymentRow,
+  resolvePaymentsForSubmit,
+  resolveReceivedPaidAmount,
+  sumInvoicePayments,
+  type InvoicePaymentFormRow,
+} from "@/app/utilsComponents/InvoicePaymentDetailsForm";
+import {
+  InvoicePaymentAccountSelect,
+  InvoicePaymentMethodSelect,
+} from "@/app/utilsComponents/invoicePaymentFields";
+import { DEFAULT_INVOICE_PAYMENT_MODE, needsBankAccount } from "@/app/utilsComponents/paymentConstants";
 
 // ── Block negative keys ───────────────────────────────────────
 const blockNeg = (e: React.KeyboardEvent<HTMLInputElement>) => {
@@ -157,6 +171,7 @@ export default function SalesInvoiceForm({
   // ── API Data ──────────────────────────────────────────────
   const { data: priceLevelData } = usePriceLevels();
   const { data: warehouseData } = useWarehouses({ limit: FORM_LOOKUP_LIMIT });
+  const { data: companySettings } = useCompanySettings();
 
   const priceLevels = priceLevelData?.data ?? [];
   const warehouseOptions = useMemo(
@@ -186,6 +201,9 @@ export default function SalesInvoiceForm({
   >(null);
   const valuesRef = useRef<{ items: SalesItemRow[] }>({ items: [emptyRow()] });
   const activePriceLevelPctRef = useRef(0);
+  const [payments, setPayments] = useState<InvoicePaymentFormRow[]>([
+    emptyInvoicePaymentRow(DEFAULT_INVOICE_PAYMENT_MODE),
+  ]);
 
   const {
     formRef,
@@ -275,6 +293,8 @@ export default function SalesInvoiceForm({
       saleMode: "cash" as "credit" | "cash",
       cashDiscountAmt: "0",
       receivedAmount: "",
+      paymentMethod: DEFAULT_INVOICE_PAYMENT_MODE,
+      paymentBankAccountId: "",
       items: [emptyRow()],
     },
 
@@ -286,13 +306,34 @@ export default function SalesInvoiceForm({
         values.items,
         values.cashDiscountAmt
       );
-      const received = Number(values.receivedAmount) || 0;
-      const paidAmount =
-        values.saleMode === "credit"
-          ? received
-          : received > 0
-            ? received
-            : invoiceTotals.grandTotal;
+      const paidAmount = resolveReceivedPaidAmount(
+        invoiceTotals.grandTotal,
+        values.receivedAmount,
+        values.saleMode
+      );
+      const splitTotal = sumInvoicePayments(payments);
+      const paymentLines = resolvePaymentsForSubmit(
+        payments,
+        paidAmount,
+        values.paymentMethod,
+        values.paymentBankAccountId
+      );
+
+      if (splitTotal > paidAmount + 0.009) {
+        toast.error("Payment split cannot exceed received amount");
+        return;
+      }
+      if (splitTotal > 0 && splitTotal < paidAmount - 0.009) {
+        toast.error("Payment split must equal received amount");
+        return;
+      }
+
+      for (const line of paymentLines) {
+        if (needsBankAccount(line.paymentMode) && !line.bankAccountId) {
+          toast.error("Select a bank account for bank/UPI payments");
+          return;
+        }
+      }
 
       const payload = {
         invoiceDate: values.invoiceDate,
@@ -305,6 +346,7 @@ export default function SalesInvoiceForm({
         cashDiscountPercent: 0,
         cashDiscountAmt: Number(values.cashDiscountAmt) || 0,
         paidAmount,
+        ...(paidAmount > 0 && paymentLines.length ? { payments: paymentLines } : {}),
         items: values.items.map((r, i) => ({
           slNo: i + 1,
           itemId: r.itemId,
@@ -377,8 +419,22 @@ export default function SalesInvoiceForm({
     }
   }, [allowPastDates, today, values.invoiceDate, setFieldValue]);
 
+  useEffect(() => {
+    const defaultType = companySettings?.defaultSalesType;
+    if (!defaultType) return;
+    setFieldValue("salesType", defaultType);
+  }, [companySettings?._id, companySettings?.defaultSalesType, setFieldValue]);
+
+  const prevSalesTypeRef = useRef<string | null>(null);
+
   // ── When salesType changes → reset customer ───────────────
   useEffect(() => {
+    if (prevSalesTypeRef.current === null) {
+      prevSalesTypeRef.current = values.salesType;
+      return;
+    }
+    if (prevSalesTypeRef.current === values.salesType) return;
+    prevSalesTypeRef.current = values.salesType;
     setFieldValue("customerId", "");
     setCustomerOption(null);
     setCustomerDetails({
@@ -388,7 +444,7 @@ export default function SalesInvoiceForm({
       stateCode: "",
       address: "",
     });
-  }, [values.salesType]);
+  }, [values.salesType, setFieldValue]);
 
   useEffect(() => {
     if (!values.items.length) return;
@@ -495,7 +551,7 @@ export default function SalesInvoiceForm({
   // ── Row field change ──────────────────────────────────────
   const handleRowChange = (
     index: number,
-    field: "qty" | "discount" | "hsn",
+    field: "qty" | "discount",
     value: string
   ) => {
     const current = valuesRef.current.items[index] ?? emptyRow();
@@ -523,9 +579,11 @@ export default function SalesInvoiceForm({
     hasTax,
   } = totals;
 
-  const receivedAmount = Number(values.receivedAmount) || 0;
-  const paidAmount =
-    receivedAmount > grandTotal ? grandTotal : receivedAmount;
+  const paidAmount = resolveReceivedPaidAmount(
+    grandTotal,
+    values.receivedAmount,
+    values.saleMode
+  );
   const balanceDue = Number((grandTotal - paidAmount).toFixed(2));
 
   return (
@@ -573,21 +631,31 @@ export default function SalesInvoiceForm({
               />
 
               {/* Sales Type */}
-              <FormSelect
-                label="Sales Type"
-                name="salesType"
-                value={values.salesType}
-                required
-                enterNav
-                options={[
-                  { label: "Retail", value: "retail" },
-                  { label: "Wholesale", value: "wholesale" },
-                ]}
-                onChange={handleChange}
-                onBlur={handleBlur}
-                touched={touched.salesType}
-                error={errors.salesType}
-              />
+              <div>
+                <label className="mb-2 block text-sm font-medium text-gray-700">
+                  <span className="text-red-500">* </span>
+                  Sales Type
+                </label>
+                <div className="flex flex-wrap gap-2">
+                  {(["retail", "wholesale"] as const).map((type) => (
+                    <button
+                      key={type}
+                      type="button"
+                      onClick={() => setFieldValue("salesType", type)}
+                      className={`rounded-md border px-4 py-2 text-sm font-medium transition ${
+                        values.salesType === type
+                          ? "border-[#1E2235] bg-[#1E2235] text-white"
+                          : "border-gray-300 bg-white text-gray-600 hover:bg-gray-50"
+                      }`}
+                    >
+                      {type === "retail" ? "Retail" : "Wholesale"}
+                    </button>
+                  ))}
+                </div>
+                {touched.salesType && errors.salesType && (
+                  <p className="mt-1 text-xs text-red-500">{errors.salesType}</p>
+                )}
+              </div>
 
               {/* Price Level */}
               <FormSelect
@@ -637,6 +705,9 @@ export default function SalesInvoiceForm({
                         setFieldValue("saleMode", mode);
                         if (mode === "credit") {
                           setFieldValue("receivedAmount", "");
+                          setFieldValue("paymentMethod", DEFAULT_INVOICE_PAYMENT_MODE);
+                          setFieldValue("paymentBankAccountId", "");
+                          setPayments([emptyInvoicePaymentRow(DEFAULT_INVOICE_PAYMENT_MODE)]);
                         } else {
                           const nextTotals = computeInvoiceTotals(
                             values.items,
@@ -648,6 +719,9 @@ export default function SalesInvoiceForm({
                               ? String(nextTotals.grandTotal)
                               : ""
                           );
+                          setFieldValue("paymentMethod", DEFAULT_INVOICE_PAYMENT_MODE);
+                          setFieldValue("paymentBankAccountId", "");
+                          setPayments([emptyInvoicePaymentRow(DEFAULT_INVOICE_PAYMENT_MODE)]);
                         }
                       }}
                       className={`rounded-md border px-4 py-2 text-sm font-medium transition ${
@@ -661,6 +735,28 @@ export default function SalesInvoiceForm({
                   ))}
                 </div>
               </div>
+
+              <InvoicePaymentMethodSelect
+                name="paymentMethod"
+                value={values.paymentMethod}
+                onChange={(e) => {
+                  handleChange(e);
+                  if (!needsBankAccount(e.target.value)) {
+                    setFieldValue("paymentBankAccountId", "");
+                  }
+                }}
+                onBlur={handleBlur}
+              />
+
+              {needsBankAccount(values.paymentMethod) && (
+                <InvoicePaymentAccountSelect
+                  paymentMode={values.paymentMethod}
+                  name="paymentBankAccountId"
+                  value={values.paymentBankAccountId}
+                  onChange={handleChange}
+                  onBlur={handleBlur}
+                />
+              )}
             </div>
           </div>
 
@@ -871,20 +967,15 @@ export default function SalesInvoiceForm({
                                 />
                               </td>
 
-                              {/* HSN */}
+                              {/* HSN — auto from product, readonly */}
                               <td className="px-3 py-2">
                                 <input
-                                  data-enter-nav="field"
                                   value={row.hsn}
-                                  onChange={(e) =>
-                                    handleRowChange(
-                                      index,
-                                      "hsn",
-                                      e.target.value
-                                    )
-                                  }
+                                  readOnly
+                                  disabled
+                                  tabIndex={-1}
                                   placeholder="HSN"
-                                  className="w-full border-b border-gray-300 bg-transparent py-1 text-sm outline-none focus:border-blue-600"
+                                  className="w-full border-b border-gray-200 bg-transparent py-1 text-sm text-gray-500 cursor-not-allowed"
                                 />
                               </td>
 
@@ -1033,8 +1124,15 @@ export default function SalesInvoiceForm({
             </FieldArray>
 
             {/* ── Summary ──────────────────────────────────── */}
-            <div className="flex justify-end p-6 border-t bg-gray-50">
-              <div className="w-full max-w-xs space-y-2 text-sm">
+            <div className="flex flex-col gap-6 border-t bg-gray-50 p-6 lg:flex-row lg:items-start lg:justify-between">
+              <InvoicePaymentDetailsForm
+                grandTotal={grandTotal}
+                receivedAmount={paidAmount}
+                payments={payments}
+                onPaymentsChange={setPayments}
+                saleMode={values.saleMode}
+              />
+              <div className={invoiceSummaryPanelClass}>
                 <div className="flex justify-between text-gray-600">
                   <span>Subtotal (Taxable Value)</span>
                   <span>₹ {lineNetAmount.toFixed(2)}</span>
@@ -1106,7 +1204,7 @@ export default function SalesInvoiceForm({
                   </div>
                 )}
 
-                <div className="flex justify-between font-bold text-gray-900 text-base border-t pt-2">
+                <div className={invoiceSummaryGrandTotalClass}>
                   <span>Amount to Collect</span>
                   <span>₹ {grandTotal.toFixed(2)}</span>
                 </div>
@@ -1127,7 +1225,7 @@ export default function SalesInvoiceForm({
                       onKeyDown={blockNeg}
                       min="0"
                       step="0.01"
-                      placeholder={values.saleMode === "credit" ? "0" : "0"}
+                      placeholder="0"
                       className="w-32 rounded-md border border-emerald-300 bg-white px-2 py-1.5 text-sm font-semibold text-right text-emerald-900 outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-200"
                     />
                   </div>

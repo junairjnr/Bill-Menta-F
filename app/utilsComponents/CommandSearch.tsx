@@ -209,7 +209,7 @@ export default function CommandSearch({
       {/* 🔍 Trigger */}
       <div
         onClick={() => setOpen(true)}
-        className="flex items-center gap-2 bg-gray-100 px-3 py-2 rounded-lg cursor-pointer w-64 text-sm text-gray-500 hover:bg-gray-200"
+        className="flex items-center gap-2 bg-white/95 px-4 py-2 rounded-full cursor-pointer w-full max-w-md text-sm text-slate-500 hover:bg-white shadow-sm ring-1 ring-white/10 transition-colors"
       >
         <Search size={16} />
         <span>Search menu... (Ctrl + K)</span>

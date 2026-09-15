@@ -1,10 +1,10 @@
 export const BRAND = {
-  logo: "/assets/pks-logo.jpg",
-  logoSource: "/assets/PKS Logo Image-02.jpg",
-  logoFallback: "/assets/logo.svg",
-  primary: "#0B2D5B",
-  accent: "#C9A227",
-  name: "PKS BROZCO ENTERPRISES",
+  logo: "/assets/billmenta.png",
+  logoFallback: "/assets/billmenta.png",
+  primary: "#1E2235",
+  accent: "#00D1C1",
+  name: "Bill Menta",
+  tagline: "Simple Billing. Smarter Business.",
 };
 
 export async function loadBrandLogoDataUrl(): Promise<string | undefined> {

@@ -650,7 +650,7 @@ import {
   useCreateItem,
   useUpdateItem,
 } from "@/app/hooks/masterHooks/itemHook/useItem";
-import { loadCategories, loadUoms } from "@/app/formComponents/masterLoadOptions";
+import { loadCategories, loadTaxMasters, loadUoms } from "@/app/formComponents/masterLoadOptions";
 import { toOption, type SelectOption } from "@/app/formComponents/selectTypes";
 import {
   percentageField,
@@ -663,8 +663,10 @@ import FormInput from "@/app/formComponents/FormText";
 import QuickAddDialog from "@/app/utilsComponents/QuickAddDialog";
 import CategoryForm from "@/app/(admin)/master/category/CategoryForm";
 import UOMForm from "@/app/(admin)/master/uom/UOMForm";
+import TaxMasterForm from "@/app/(admin)/master/taxMaster/TaxMasterForm";
 import {
   categoryFormFooterButtons,
+  taxMasterFormFooterButtons,
   uomFormFooterButtons,
 } from "@/app/utilsComponents/form-footer";
 import { getEntityId } from "@/app/utilsComponents/InvoiceQuickAddModals";
@@ -680,6 +682,7 @@ interface ProductFormProps {
     purchaseRate: number | string;
     price: number | string;
     taxPercent: number | string;
+    taxMasterId?: string;
     categoryId: string;
     description: string;
     isActive: boolean;
@@ -709,11 +712,15 @@ const ProductForm = ({
   const router = useRouter();
   const [categoryModal, setCategoryModal] = useState(false);
   const [uomModal, setUomModal] = useState(false);
+  const [taxMasterModal, setTaxMasterModal] = useState(false);
   const [nestedPending, setNestedPending] = useState(false);
   const [categoryOption, setCategoryOption] = useState<SelectOption | null>(
     null
   );
   const [uomOption, setUomOption] = useState<SelectOption | null>(null);
+  const [taxMasterOption, setTaxMasterOption] = useState<SelectOption | null>(
+    null
+  );
 
   const { mutate: create, isPending: creating } = useCreateItem();
   const { mutate: update, isPending: updating } = useUpdateItem();
@@ -729,6 +736,7 @@ const ProductForm = ({
       ? {
           ...initialValues,
           hasGst: Number(initialValues.taxPercent) > 0 ? "yes" : "no",
+          taxMasterId: initialValues.taxMasterId ?? "",
         }
       : {
       name: "",
@@ -738,7 +746,8 @@ const ProductForm = ({
       salesRate: "",
       purchaseRate: "",
       price: "",
-      taxPercent: 18,
+      taxPercent: 0,
+      taxMasterId: "",
       hasGst: "no" as "yes" | "no",
       categoryId: "",
       description: "",
@@ -753,9 +762,14 @@ const ProductForm = ({
       salesRate: positiveNumber,
       purchaseRate: positiveNumber,
       hasGst: Yup.string().oneOf(["yes", "no"]),
+      taxMasterId: Yup.string().when("hasGst", {
+        is: "yes",
+        then: (schema) => schema.required("Select tax slab"),
+        otherwise: (schema) => schema.notRequired(),
+      }),
       taxPercent: Yup.number().when("hasGst", {
         is: "yes",
-        then: (schema) => schema.min(0.01, "Enter GST %").max(100),
+        then: (schema) => schema.min(0.01, "Select a valid tax slab").max(100),
         otherwise: (schema) => schema.min(0).max(100),
       }),
       categoryId: Yup.string().required("Category is required"),
@@ -774,6 +788,7 @@ const ProductForm = ({
         purchaseRate: Number(values.purchaseRate),
         price: Number(values.salesRate),
         taxPercent: values.hasGst === "yes" ? Number(values.taxPercent) : 0,
+        taxMasterId: values.hasGst === "yes" ? values.taxMasterId : undefined,
         categoryId: values.categoryId,
         description: values.description,
         isActive: values.isActive,
@@ -931,8 +946,8 @@ const ProductForm = ({
                     setFieldValue("hasGst", option);
                     if (option === "no") {
                       setFieldValue("taxPercent", 0);
-                    } else if (!Number(values.taxPercent)) {
-                      setFieldValue("taxPercent", 18);
+                      setFieldValue("taxMasterId", "");
+                      setTaxMasterOption(null);
                     }
                   }}
                   className={`rounded-md border px-4 py-2 text-sm font-medium transition ${
@@ -948,17 +963,26 @@ const ProductForm = ({
           </div>
 
           {values.hasGst === "yes" && (
-            <FormNumberInput
-              label="GST %"
-              name="taxPercent"
-              value={values.taxPercent}
-              placeholder="18"
+            <FormSelectWithAdd
+              label="Tax Slab"
+              value={values.taxMasterId}
+              selectedOption={taxMasterOption}
               required
-              error={errors.taxPercent}
-              touched={touched.taxPercent}
-              onChange={handleChange}
-              onBlur={handleBlur}
-              onKeyDown={blockNegative}
+              error={errors.taxMasterId}
+              touched={touched.taxMasterId}
+              loadOptions={loadTaxMasters}
+              placeholder="Search tax slab..."
+              addLabel="Add Tax Master"
+              onAddClick={() => setTaxMasterModal(true)}
+              onValueChange={(id, opt) => {
+                setFieldValue("taxMasterId", id);
+                setTaxMasterOption(opt);
+                const taxPercent = Number(
+                  (opt?.data as { taxPercent?: number })?.taxPercent ?? 0
+                );
+                setFieldValue("taxPercent", taxPercent);
+              }}
+              onBlur={() => setFieldTouched("taxMasterId", true)}
             />
           )}
 
@@ -1029,6 +1053,33 @@ const ProductForm = ({
             setFieldValue("uomId", id);
             setUomOption(toOption(id, label, data));
             setUomModal(false);
+          }}
+        />
+      </QuickAddDialog>
+
+      <QuickAddDialog
+        open={taxMasterModal}
+        onOpenChange={setTaxMasterModal}
+        title="Add Tax Master"
+        footerButtons={taxMasterFormFooterButtons({
+          isPending: nestedPending,
+          onCancel: () => setTaxMasterModal(false),
+        })}
+      >
+        <TaxMasterForm
+          modalMode
+          onPendingChange={setNestedPending}
+          onSuccess={(data) => {
+            const id = getEntityId(data);
+            const t = data as { name?: string; taxPercent?: number };
+            const label =
+              t.name && t.taxPercent != null
+                ? `${t.name} (${t.taxPercent}%)`
+                : (t.name ?? "Tax Master");
+            setFieldValue("taxMasterId", id);
+            setFieldValue("taxPercent", Number(t.taxPercent ?? 0));
+            setTaxMasterOption(toOption(id, label, data));
+            setTaxMasterModal(false);
           }}
         />
       </QuickAddDialog>

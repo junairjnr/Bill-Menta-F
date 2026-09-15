@@ -93,7 +93,9 @@ export default function SalesReturnHistoryPage() {
               { label: "Retail", value: summary.retailReturns },
               { label: "Wholesale", value: summary.wholesaleReturns },
               { label: "Total Qty", value: summary.totalQty },
-              { label: "Taxable", value: fmtMoney(summary.totalTaxable) },
+              { label: "Total Taxable", value: fmtMoney(summary.totalTaxable) },
+              { label: "SGST", value: fmtMoney(summary.totalSGST ?? 0) },
+              { label: "CGST", value: fmtMoney(summary.totalCGST ?? 0) },
               { label: "Total Value", value: fmtMoney(summary.totalValue), highlight: true },
             ]
           : undefined

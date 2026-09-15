@@ -143,7 +143,7 @@
 "use client";
 
 import { useLogin } from "@/app/hooks/authHook/useAuth";
-import BrandLogo from "@/app/utilsComponents/BrandLogo";
+import BrandLogo, { BrandTitle } from "@/app/utilsComponents/BrandLogo";
 import { BRAND } from "@/app/config/brand";
 import { Eye, EyeOff } from "lucide-react";
 import { useRouter } from "next/navigation";
@@ -186,15 +186,18 @@ const LoginPage = () => {
           className="hidden md:flex flex-col items-center justify-center p-10 text-white"
           style={{ background: `linear-gradient(135deg, ${BRAND.primary}, ${BRAND.accent})` }}
         >
-          <BrandLogo width={300} className="mb-4" />
-          <p className="text-sm text-white/80">Billing & Inventory Management</p>
+          <BrandLogo variant="onDark" className="mb-4" />
+          <BrandTitle size="lg" light className="mb-1" />
+          <p className="text-sm font-semibold text-white/85 tracking-wide">
+            {BRAND.tagline}
+          </p>
         </div>
 
         {/* Right side (form) */}
         <div className="p-8 md:p-12 flex flex-col justify-center">
           <form onSubmit={handleSubmit} className="space-y-5">
             <div className="mb-2 flex flex-col items-center text-center">
-              <BrandLogo width={260} />
+              <BrandLogo variant="default" width={280} />
               <p className="mt-3 text-sm text-gray-500">
                 Welcome back! Log in to your account.
               </p>

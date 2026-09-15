@@ -62,6 +62,7 @@ export interface CompanySettings {
   terms?: string;
   logo?: string;
   plan?: "free" | "pro" | "enterprise";
+  defaultSalesType?: "retail" | "wholesale";
   isActive?: boolean;
 }
 

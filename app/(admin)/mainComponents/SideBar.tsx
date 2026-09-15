@@ -372,14 +372,12 @@
 // }
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef, type ReactNode } from "react";
 import { X, Menu, ChevronDown, ChevronRight } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { sections } from "../../utilsComponents/SideSection";
 import { colors } from "../../utilsComponents/Colors";
-import { logger } from "../../utilsComponents/console";
-import { motion, AnimatePresence } from "framer-motion";
 import { usePermissions } from "@/app/hooks/usePermissions";
 import { ViewPermissionKey } from "@/app/config/permissions";
 
@@ -404,10 +402,35 @@ export const skynetClient = {
   },
 };
 
+const sectionIconTone: Record<string, string> = {
+  MAIN: "text-blue-400",
+  MASTER: "text-violet-400",
+  SALES: "text-emerald-400",
+  PURCHASE: "text-amber-400",
+  "RECEIPT / PAYMENT": "text-cyan-400",
+  EXPENSE: "text-orange-400",
+  ACCOUNTING: "text-indigo-400",
+  REPORTS: "text-pink-400",
+  SETTINGS: "text-slate-300",
+};
+
+function sidebarIconWrap(
+  icon: ReactNode,
+  sectionTitle: string,
+  isActive: boolean
+) {
+  const tone = isActive
+    ? "text-[#00D1C1]"
+    : sectionIconTone[sectionTitle] ?? "text-slate-400";
+
+  return <span className={`shrink-0 transition-colors ${tone}`}>{icon}</span>;
+}
+
 export default function Sidebar() {
   const [collapsed, setCollapsed] = useState(false);
   const [hovered, setHovered] = useState(false);
   const [openMenu, setOpenMenu] = useState<string | null>(null);
+  const navRef = useRef<HTMLElement>(null);
   const { canView, isSuperAdmin, permissions } = usePermissions();
 
   const pathname = usePathname();
@@ -444,8 +467,13 @@ export default function Sidebar() {
     return pathname === basePath || pathname.startsWith(basePath + "/");
   };
 
-  const isSubMenuActive = (subMenu: any[]) => {
+  const isSubMenuActive = (subMenu: { path: string }[]) => {
     return subMenu.some((sub) => isPathActive(sub.path));
+  };
+
+  const scrollMenuItemIntoView = (element: HTMLElement | null) => {
+    if (!element || !navRef.current) return;
+    element.scrollIntoView({ behavior: "smooth", block: "center", inline: "nearest" });
   };
 
   // Auto-open the menu group that contains the current route
@@ -454,51 +482,45 @@ export default function Sidebar() {
       for (const item of section.items) {
         if (item.subMenu && isSubMenuActive(item.subMenu)) {
           setOpenMenu(item.name);
+          requestAnimationFrame(() => {
+            const activeEl = navRef.current?.querySelector('[data-sidebar-active="true"]');
+            if (activeEl instanceof HTMLElement) {
+              scrollMenuItemIntoView(activeEl);
+            }
+          });
           return;
         }
       }
     }
   }, [pathname, permissions, isSuperAdmin]);
-  useEffect(() => {
-    logger("open", openMenu);
-  }, [openMenu]);
 
   const toggleMenu = (menuName: string) => {
     setOpenMenu((prev) => (prev === menuName ? null : menuName));
   };
 
   return (
-    <aside className="bg-white h-full flex flex-col overflow-hidden transition-all duration-500">
+    <aside className="bg-[#1E2235] h-full flex flex-col overflow-hidden transition-all duration-500 border-r border-white/5">
       {/* Header */}
       <div
-        className={`shrink-0 ${
-          collapsed ? "w-16" : "w-48"
+        className={`shrink-0 border-b border-white/5 ${
+          collapsed ? "w-16" : "w-52"
         } flex items-center justify-between px-4 py-3 transition-all duration-500`}
       >
         {!collapsed && (
-          <h1 className="flex items-center gap-2 text-lg font-bold text-blue-900">
-            <span className="text-emerald-900">BROSCO™</span>
-            {/* <span className="text-emerald-300">SKYNET™</span> */}
-          </h1>
-          // <motion.button
-          //   type="button"
-          //   onClick={() => window.open(skynetClient.siteUrl, "_blank")}
-          //   className="flex shrink-0 cursor-pointer flex-col items-start border-0 bg-transparent p-0"
-          //   whileHover={{ scale: 1.03 }}
-          //   whileTap={{ scale: 0.97 }}
-          // >
-          //   <span className="font-display text-[20px] font-extrabold leading-none tracking-tight text-gray-900 sm:text-[22px]">
-          //     {skynetClient.name.split(" ")[0]}
-          //     <span className="text-[11px] font-black text-gray-400">™</span>
-          //   </span>
-          //   <span className="hidden font-eyebrow text-[7px] tracking-[0.22em] text-gray-400 sm:block">
-          //     {skynetClient.tagline}
-          //   </span>
-          // </motion.button>
+          <div className="min-w-0 leading-tight">
+            <p className={`text-xl font-bold tracking-wide ${colors.sidebarBrand}`}>
+              BillMenta™
+            </p>
+            <p
+              className={`text-[10px] font-medium uppercase tracking-wide ${colors.sidebarBrandSub}`}
+            >
+              Accounts Management
+            </p>
+          </div>
         )}
         <button
           onClick={() => setCollapsed(!collapsed)}
-          className="text-gray-600"
+          className="text-slate-400 hover:text-white transition-colors"
         >
           {collapsed ? <X size={20} /> : <Menu size={20} />}
         </button>
@@ -507,28 +529,33 @@ export default function Sidebar() {
       {/* Navigation */}
       <div
         className={`flex-1 min-h-0 overflow-hidden transition-all duration-500 ${
-          isExpanded ? "w-48" : "w-16"
+          isExpanded ? "w-52" : "w-16"
         }`}
         onMouseEnter={() => setHovered(true)}
         onMouseLeave={() => setHovered(false)}
       >
-        <nav className="sidebar-scrollbar h-full overflow-y-auto overscroll-contain px-2 py-4 pb-20 space-y-4">
+        <nav
+          ref={navRef}
+          className="sidebar-scrollbar h-full overflow-y-auto overscroll-contain px-2 py-4 pb-20 space-y-4"
+        >
           {filteredSections.map((section, sIdx) => (
             <div key={sIdx}>
               {/* Section heading */}
               <div className="px-2 mb-1">
                 {isExpanded ? (
-                  <span className="text-[11px] font-semibold text-[#7987a1] tracking-wider">
+                  <span
+                    className={`text-xs font-semibold uppercase tracking-widest ${colors.sidebarSection}`}
+                  >
                     {section.title}
                   </span>
                 ) : (
                   <span className="flex justify-center mr-3">
-                    <span className="w-1.5 h-1.5 bg-[#7987a1] rounded-full"></span>
+                    <span className="w-1.5 h-1.5 bg-slate-600 rounded-full"></span>
                   </span>
                 )}
               </div>
 
-              <ul className="space-y-1 text-sm">
+              <ul className="space-y-1 text-base">
                 {section.items.map((item, idx) => {
                   const isParentActive = item.subMenu
                     ? isSubMenuActive(item.subMenu)
@@ -539,32 +566,42 @@ export default function Sidebar() {
                       {item.subMenu ? (
                         <>
                           <button
-                            onClick={() => toggleMenu(item.name)}
-                            className={`w-full flex items-center justify-between px-2 py-2 rounded-md transition ${
+                            type="button"
+                            onClick={(e) => {
+                              const willOpen = openMenu !== item.name;
+                              toggleMenu(item.name);
+                              if (willOpen) {
+                                scrollMenuItemIntoView(e.currentTarget);
+                              }
+                            }}
+                            className={`w-full flex items-center justify-between px-2 py-2.5 rounded-md transition ${
                               isParentActive && isExpanded
-                                ? `${colors.mainColor} text-white`
-                                : "text-gray-700 hover:bg-gray-100"
+                                ? colors.navActive
+                                : `${colors.sidebarNav} ${colors.sidebarNavHover}`
                             }`}
                           >
                             <span className="flex items-center gap-2">
                               {/* {item.icon} */}
                               {/* {isExpanded && <span>{item.name}</span>} */}
                               <span className="flex items-center gap-2">
-                                {item.icon}
+                                {sidebarIconWrap(
+                                  item.icon,
+                                  section.title,
+                                  Boolean(isParentActive && isExpanded)
+                                )}
                                 {isExpanded && <span>{item.name}</span>}
                               </span>
                             </span>
 
                             {isExpanded &&
-                              (openMenu === item.name || isParentActive ? (
-                                <ChevronDown size={14} />
+                              (openMenu === item.name ? (
+                                <ChevronDown size={16} />
                               ) : (
-                                <ChevronRight size={14} />
+                                <ChevronRight size={16} />
                               ))}
                           </button>
 
-                          {/* Submenu — show when toggled open or when a child route is active */}
-                          {isExpanded && (openMenu === item.name || isParentActive) && (
+                          {isExpanded && openMenu === item.name && (
                             <ul className="ml-6 mt-1 space-y-1">
                               {item.subMenu.map((sub, subIdx) => {
                                 const isActive = isPathActive(sub.path);
@@ -573,13 +610,15 @@ export default function Sidebar() {
                                   <li key={subIdx}>
                                     <Link
                                       href={sub.path}
-                                      className={`flex items-center gap-2 px-2 py-1 text-[12px] rounded-md transition ${
+                                      data-sidebar-active={isActive ? "true" : undefined}
+                                      onClick={(e) => scrollMenuItemIntoView(e.currentTarget)}
+                                      className={`flex items-center gap-2 px-2 py-1.5 text-sm rounded-md transition ${
                                         isActive
-                                          ? `text-white ${colors.mainColor}`
-                                          : "text-gray-600 hover:text-blue-600 hover:bg-gray-50"
+                                          ? colors.navActive
+                                          : `${colors.sidebarNav} ${colors.sidebarNavHover}`
                                       }`}
                                     >
-                                      {sub.icon}
+                                      {sidebarIconWrap(sub.icon, section.title, isActive)}
                                       {sub.name}
                                     </Link>
                                   </li>
@@ -591,13 +630,21 @@ export default function Sidebar() {
                       ) : (
                         <Link
                           href={item.path || "#"}
-                          className={`flex items-center gap-2 px-2 py-2 rounded-md transition ${
+                          data-sidebar-active={
+                            isPathActive(item.path || "") ? "true" : undefined
+                          }
+                          onClick={(e) => scrollMenuItemIntoView(e.currentTarget)}
+                          className={`flex items-center gap-2 px-2 py-2.5 rounded-md transition ${
                             isPathActive(item.path || "")
-                              ? `${colors.mainColor} text-white`
-                              : "text-gray-700 hover:bg-gray-100"
+                              ? colors.navActive
+                              : `${colors.sidebarNav} ${colors.sidebarNavHover}`
                           }`}
                         >
-                          {item.icon}
+                          {sidebarIconWrap(
+                            item.icon,
+                            section.title,
+                            isPathActive(item.path || "")
+                          )}
                           {isExpanded && item.name}
                         </Link>
                       )}

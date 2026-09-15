@@ -8,6 +8,19 @@ export const PAYMENT_MODE_LABELS: Record<string, string> = {
   other: "Other",
 };
 
+export const INVOICE_PAYMENT_MODES = [
+  { label: "Cash", value: "cash" },
+  { label: "Bank", value: "bank" },
+  { label: "UPI", value: "upi" },
+];
+
+export const DEFAULT_INVOICE_PAYMENT_MODE = "cash";
+
+export const invoicePaymentAccountLabel = (mode: string) => {
+  if (mode === "cash") return "Cash Account";
+  return "Bank Account";
+};
+
 export const PAYMENT_MODES = [
   { label: "Cash", value: "cash" },
   { label: "Cheque", value: "cheque" },
@@ -55,6 +68,24 @@ export function resolveBalance(
   _balanceAmount?: number
 ): number {
   return Math.max(0, Number((grandTotal - paidAmount).toFixed(2)));
+}
+
+export function deriveInvoicePaymentSummary(grandTotal: number, paidAmount: number) {
+  const totalPaid = Math.max(0, Number(paidAmount.toFixed(2)));
+  const balance = resolveBalance(grandTotal, totalPaid);
+  let status: PaymentStatus = "pending";
+
+  if (grandTotal <= 0) {
+    status = "pending";
+  } else if (totalPaid >= grandTotal - 0.009) {
+    status = "paid";
+  } else if (totalPaid > 0) {
+    status = "partial";
+  } else {
+    status = "unpaid";
+  }
+
+  return { totalPaid, balance, status };
 }
 
 type NamedSnapshot = { name?: string };

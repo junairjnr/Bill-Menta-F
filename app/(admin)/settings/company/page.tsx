@@ -20,6 +20,7 @@ interface CompanyFormValues {
   terms: string;
   logo: string;
   plan: "free" | "pro" | "enterprise";
+  defaultSalesType: "retail" | "wholesale";
 }
 
 export default function CompanySettingsPage() {
@@ -42,6 +43,7 @@ export default function CompanySettingsPage() {
       terms: company?.terms || "",
       logo: company?.logo || "",
       plan: company?.plan || "free",
+      defaultSalesType: company?.defaultSalesType || "retail",
     },
     validationSchema: Yup.object({
       name: Yup.string().required("Company name is required"),
@@ -102,7 +104,7 @@ export default function CompanySettingsPage() {
       <div className="space-y-4 p-6">
         <PageHeader
           title="Company Settings"
-          description="Manage company profile and invoice code (PKS)"
+          description="Manage company profile and invoice code"
         />
 
         <form
@@ -135,6 +137,33 @@ export default function CompanySettingsPage() {
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
             {renderField("GSTIN", "gstin")}
           </div>
+
+          <div>
+            <label className="mb-2 block text-sm font-medium text-gray-700">
+              Default Sales Type (Invoice)
+            </label>
+            <div className="flex flex-wrap gap-2">
+              {(["retail", "wholesale"] as const).map((type) => (
+                <button
+                  key={type}
+                  type="button"
+                  disabled={!canSave}
+                  onClick={() => formik.setFieldValue("defaultSalesType", type)}
+                  className={`rounded-md border px-4 py-2 text-sm font-medium transition disabled:opacity-60 ${
+                    formik.values.defaultSalesType === type
+                      ? "border-[#1E2235] bg-[#1E2235] text-white"
+                      : "border-gray-300 bg-white text-gray-600 hover:bg-gray-50"
+                  }`}
+                >
+                  {type === "retail" ? "Retail" : "Wholesale"}
+                </button>
+              ))}
+            </div>
+            <p className="mt-1 text-xs text-gray-500">
+              Pre-selected on new sales invoices; can be changed per invoice.
+            </p>
+          </div>
+
           <div>
             <label className="mb-1 block text-sm font-medium text-gray-700">
               Terms & Conditions (Invoice)

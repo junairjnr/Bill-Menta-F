@@ -156,3 +156,34 @@ export const useExpenseReport = (params?: {
     placeholderData: keepPreviousData,
     staleTime: 0,
   });
+
+export const useSalesReturnReport = (params?: {
+  dateFrom?: string;
+  dateTo?: string;
+  customerId?: string;
+  salesType?: string;
+  warehouseId?: string;
+  status?: string;
+  page?: number;
+  limit?: number;
+}) =>
+  useQuery({
+    queryKey: ["reports", "sales-return", params],
+    queryFn: () => reportsService.getSalesReturnReport(params),
+    placeholderData: keepPreviousData,
+  });
+
+export const usePurchaseReturnReport = (params?: {
+  dateFrom?: string;
+  dateTo?: string;
+  vendorId?: string;
+  warehouseId?: string;
+  status?: string;
+  page?: number;
+  limit?: number;
+}) =>
+  useQuery({
+    queryKey: ["reports", "purchase-return", params],
+    queryFn: () => reportsService.getPurchaseReturnReport(params),
+    placeholderData: keepPreviousData,
+  });

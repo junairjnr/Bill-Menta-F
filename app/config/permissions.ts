@@ -5,6 +5,7 @@ export type ViewPermissionKey =
   | "master.category"
   | "master.uom"
   | "master.priceLevel"
+  | "master.taxMaster"
   | "master.branch"
   | "master.financialYear"
   | "master.warehouse"
@@ -53,6 +54,7 @@ export const PATH_PERMISSION_MAP: Record<string, ViewPermissionKey> = {
   "/master/category": "master.category",
   "/master/uom": "master.uom",
   "/master/priceLevel": "master.priceLevel",
+  "/master/taxMaster": "master.taxMaster",
   "/master/branch": "master.branch",
   "/master/financialYear": "master.financialYear",
   "/master/warehouse": "master.warehouse",
@@ -71,6 +73,8 @@ export const PATH_PERMISSION_MAP: Record<string, ViewPermissionKey> = {
   "/reports/salesHistory": "reports.salesHistory",
   "/reports/salesReturnHistory": "reports.salesReturnHistory",
   "/reports/purchaseReturnHistory": "reports.purchaseReturnHistory",
+  "/reports/salesReturnReport": "reports.salesReturnHistory",
+  "/reports/purchaseReturnReport": "reports.purchaseReturnHistory",
   "/expense": "expense.voucher",
   "/reports/expense": "reports.expense",
   "/accounting/entries": "accounting.entries",

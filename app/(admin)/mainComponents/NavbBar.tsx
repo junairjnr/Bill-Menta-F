@@ -15,6 +15,7 @@ import { useEffect, useRef, useState } from "react";
 import { sections } from "../../utilsComponents/SideSection";
 import { useLogout } from "@/app/hooks/authHook/useAuth";
 import { logger } from "../../utilsComponents/console";
+import { colors } from "../../utilsComponents/Colors";
 
 export default function Navbar() {
   const [open, setOpen] = useState(false);
@@ -43,29 +44,24 @@ export default function Navbar() {
   }, []);
 
   return (
-    <header className="w-full flex items-center justify-between bg-white px-6 py-2  border-gray-200 relative">
+    <header className="w-full flex items-center justify-between bg-[#1E2235] px-6 py-2 relative">
       {/* 🔍 Search Bar */}
-      <div className="flex items-center  px-3 py-2 w-1/3 rounded-md">
+      <div className="flex items-center px-3 py-2 w-1/3">
         <CommandSearch sections={sections} />
-        {/* <input
-          type="text"
-          placeholder="Search here..."
-          className="ml-2 w-full outline-none text-gray-600 placeholder-gray-400"
-        /> */}
       </div>
 
       {/* Quick actions + profile */}
       <div className="flex items-center gap-4">
         <Link
           href="/sales/salesInvoice/add"
-          className="hidden sm:flex items-center gap-1.5 rounded-lg bg-emerald-700 px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-800 transition-colors"
+          className={`hidden sm:flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold text-[#1E2235] transition-colors ${colors.accentBg} ${colors.accentBgHover}`}
         >
           <ShoppingCart className="h-3.5 w-3.5" />
           Add Sale
         </Link>
         <Link
           href="/purchase/purchaseInvoice/add"
-          className="hidden sm:flex items-center gap-1.5 rounded-lg bg-blue-700 px-3 py-1.5 text-xs font-semibold text-white hover:bg-blue-800 transition-colors"
+          className={`hidden sm:flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold text-white transition-colors ${colors.primaryButton}`}
         >
           <Truck className="h-3.5 w-3.5" />
           Add Purchase
@@ -73,7 +69,7 @@ export default function Navbar() {
 
         {/* 🔔 Notification with Dot */}
         <div className="relative">
-          <Bell className="text-gray-600 cursor-pointer" size={22} />
+          <Bell className="text-slate-400 hover:text-white cursor-pointer transition-colors" size={22} />
           <span className="absolute top-0 right-0 bg-red-500 w-2 h-2 rounded-full"></span>
         </div>
 
@@ -83,7 +79,7 @@ export default function Navbar() {
           className="flex items-center cursor-pointer relative"
           onClick={() => setOpen(!open)}
         >
-          <User className="w-6 h-6 mb-1 rounded-full border-2 border-gray-600 text-gray-600" />
+          <User className="w-6 h-6 mb-1 rounded-full border-2 border-slate-500 text-slate-400 hover:border-[#00D1C1] hover:text-[#00D1C1] transition-colors" />
           {/* <span className="ml-2 text-gray-700">Profile</span> */}
 
           {/* Dropdown */}

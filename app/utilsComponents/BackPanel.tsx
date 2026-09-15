@@ -80,7 +80,7 @@ export default function BackPanel({
       icon: <SquarePen size={16} strokeWidth={2.25} />,
       onClick: () => router.push(editPath),
       className: cn(
-        "rounded-lg px-5 py-2 text-sm font-semibold text-white shadow-sm hover:bg-emerald-900",
+        "rounded-lg px-5 py-2 text-sm font-semibold text-white shadow-sm hover:bg-[#252a40]",
         colors.mainColor
       ),
     });
@@ -89,7 +89,7 @@ export default function BackPanel({
   footerButtons.push(...buttons);
 
   return (
-    <div className="h-full bg-gray-100 p-3">
+    <div className="h-full bg-[#F4F6F8] p-3">
       <div className="mx-auto flex h-full flex-col overflow-hidden rounded-lg bg-white shadow-sm">
         <div className="flex-1 overflow-y-auto">
           {showBack && (
