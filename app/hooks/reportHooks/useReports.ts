@@ -71,6 +71,7 @@ export const useLedgerReport = (params: {
 export const useShopReport = (params?: {
   partyType?: "customer" | "vendor";
   partyId?: string;
+  salesType?: "retail" | "wholesale";
   dateFrom?: string;
   dateTo?: string;
   page?: number;

@@ -27,6 +27,7 @@ import {
 import { useInvoiceFormShortcuts } from "@/app/hooks/useInvoiceFormShortcuts";
 import InvoiceFormKeyboardHints from "@/app/utilsComponents/InvoiceFormKeyboardHints";
 import { invoiceItemsTableClass } from "@/app/utilsComponents/report-ui";
+import { resetManualLineKeepingKey } from "@/app/utilsComponents/invoiceFormUtils";
 import InvoiceQuickAddModals, {
   getEntityId,
   type QuickAddModal,
@@ -99,7 +100,7 @@ export default function PurchaseReturnForm({ onPendingChange }: PurchaseReturnFo
   const [quickAdd, setQuickAdd] = useState<QuickAddModal>(null);
   const [productRowKey, setProductRowKey] = useState<string | null>(null);
 
-  const { formRef, allowPastDates, today, minDate, maxDate, handleFormKeyDown, dateHint } =
+  const { formRef, allowPastDates, today, minDate, maxDate, handleFormKeyDown, dateHint, keyboard } =
     useInvoiceFormShortcuts();
 
   const { data: invoiceList } = usePurchaseInvoices({ limit: LOOKUP_LIMIT });
@@ -189,6 +190,31 @@ export default function PurchaseReturnForm({ onPendingChange }: PurchaseReturnFo
     setManualLines((prev) =>
       prev.map((line) => (line.key === key ? { ...line, [field]: value } : line))
     );
+  };
+
+  const resetManualReturnFields = () => {
+    setVendorId("");
+    setVendorOption(null);
+    setWarehouseId("");
+    setReferenceInvoiceNo("");
+    setVendorInvoiceNo("");
+    setManualLines([newManualLine()]);
+    setAttachments([]);
+  };
+
+  const resetInvoiceReturnFields = () => {
+    setInvoiceId(presetInvoiceId || "");
+    setReturnQtys({});
+  };
+
+  const handleReturnModeChange = (mode: ReturnMode) => {
+    if (mode === returnMode) return;
+    setReturnMode(mode);
+    if (mode === "invoice") {
+      resetManualReturnFields();
+    } else {
+      resetInvoiceReturnFields();
+    }
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -285,7 +311,7 @@ export default function PurchaseReturnForm({ onPendingChange }: PurchaseReturnFo
         description="Return against a purchase invoice or record a manual return when invoice data is missing"
       />
 
-      <InvoiceFormKeyboardHints allowPastDates={allowPastDates} />
+      <InvoiceFormKeyboardHints allowPastDates={allowPastDates} keyboard={keyboard} />
 
       <form
         ref={formRef}
@@ -306,7 +332,7 @@ export default function PurchaseReturnForm({ onPendingChange }: PurchaseReturnFo
                 key={mode}
                 type="button"
                 disabled={!!presetInvoiceId && mode === "manual"}
-                onClick={() => setReturnMode(mode)}
+                onClick={() => handleReturnModeChange(mode)}
                 className={`rounded-md border px-4 py-2 text-sm font-medium transition ${
                   returnMode === mode
                     ? "border-black bg-black text-white"
@@ -330,7 +356,10 @@ export default function PurchaseReturnForm({ onPendingChange }: PurchaseReturnFo
                   disabled={!!presetInvoiceId}
                   options={invoiceOptions}
                   placeholder="Select invoice..."
-                  onChange={(e) => setInvoiceId(e.target.value)}
+                  onChange={(e) => {
+                    setInvoiceId(e.target.value);
+                    setReturnQtys({});
+                  }}
                   onBlur={() => {}}
                 />
               </div>
@@ -551,6 +580,14 @@ export default function PurchaseReturnForm({ onPendingChange }: PurchaseReturnFo
                         }
                         loadOptions={loadItems}
                         onChange={(itemId, opt) => {
+                          if (!itemId) {
+                            setManualLines((prev) =>
+                              prev.map((l) =>
+                                l.key === line.key ? { ...newManualLine(), key: l.key } : l
+                              )
+                            );
+                            return;
+                          }
                           const itemData = opt?.data as {
                             price?: number;
                             name?: string;
@@ -560,14 +597,15 @@ export default function PurchaseReturnForm({ onPendingChange }: PurchaseReturnFo
                             prev.map((l) =>
                               l.key === line.key
                                 ? {
-                                    ...l,
+                                    ...newManualLine(),
+                                    key: l.key,
                                     itemId,
                                     itemName: opt?.label ?? "",
-                                    rate: l.rate || String(itemPurchaseRate(itemData) || ""),
+                                    rate: String(itemPurchaseRate(itemData) || ""),
                                     taxPercent:
                                       itemData?.taxPercent != null
                                         ? String(itemData.taxPercent)
-                                        : l.taxPercent,
+                                        : "18",
                                   }
                                 : l
                             )
@@ -686,14 +724,13 @@ export default function PurchaseReturnForm({ onPendingChange }: PurchaseReturnFo
           setManualLines((prev) =>
             prev.map((l) =>
               l.key === productRowKey
-                ? {
-                    ...l,
+                ? resetManualLineKeepingKey(newManualLine, l.key, {
                     itemId: id,
                     itemName: item.name ?? "",
-                    rate: String(itemPurchaseRate(item) || l.rate),
+                    rate: String(itemPurchaseRate(item) || ""),
                     taxPercent:
-                      item.taxPercent != null ? String(item.taxPercent) : l.taxPercent,
-                  }
+                      item.taxPercent != null ? String(item.taxPercent) : "18",
+                  })
                 : l
             )
           );

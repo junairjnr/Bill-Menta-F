@@ -65,8 +65,11 @@ export function resolvePaymentStatus(
 export function resolveBalance(
   grandTotal: number,
   paidAmount = 0,
-  _balanceAmount?: number
+  balanceAmount?: number
 ): number {
+  if (balanceAmount != null && !Number.isNaN(Number(balanceAmount))) {
+    return Math.max(0, Number(Number(balanceAmount).toFixed(2)));
+  }
   return Math.max(0, Number((grandTotal - paidAmount).toFixed(2)));
 }
 

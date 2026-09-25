@@ -3,6 +3,7 @@ import { ApiResponse } from "@/app/types";
 
 export type DocumentNumberType =
   | "sales_invoice"
+  | "quotation"
   | "purchase_invoice"
   | "sales_return"
   | "purchase_return"

@@ -28,10 +28,10 @@ const COLS = [
   "Type",
   "Customer",
   "Original Invoice",
-  "Net Amount",
+  "Taxable Value",
   "SGST",
   "CGST",
-  "Grand Total",
+  "Total",
   "Status",
 ].map((l, i) => ({
   label: l,
@@ -109,10 +109,10 @@ export default function SalesReturnReportPage() {
               { label: "Returns", value: data.summary.totalReturns },
               { label: "Retail", value: data.summary.retailCount },
               { label: "Wholesale", value: data.summary.wholesaleCount },
-              { label: "Net Amount", value: fmtMoney(data.summary.totalNetAmount) },
+              { label: "Taxable Value", value: fmtMoney(data.summary.totalNetAmount) },
               { label: "SGST", value: fmtMoney(data.summary.totalSGST) },
               { label: "CGST", value: fmtMoney(data.summary.totalCGST) },
-              { label: "Grand Total", value: fmtMoney(data.summary.grandTotal), highlight: true },
+              { label: "Total Value", value: fmtMoney(data.summary.grandTotal), highlight: true },
             ]
           : undefined
       }

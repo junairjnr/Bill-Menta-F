@@ -1,6 +1,7 @@
 import { reportsService } from "@/app/services/reportsServices/reports.services";
 import { accountingService } from "@/app/services/accountingServices/accounting.service";
 import { salesService } from "@/app/services/salesInvoiceServices/salesInvoice.service";
+import { quotationService } from "@/app/services/salesInvoiceServices/quotation.service";
 import { salesReturnService } from "@/app/services/salesInvoiceServices/salesReturn.service";
 import { purchaseService } from "@/app/services/purchaseServices/purchaseInvoice.service";
 import { purchaseReturnService } from "@/app/services/purchaseServices/purchaseReturn.service";
@@ -64,9 +65,9 @@ const exportRegistry: Record<string, ExportConfig> = {
       defineCol("salesType", "Type"),
       defineCol("customer", "Customer"),
       defineCol("priceLevel", "Price Level"),
-      defineCol("netAmount", "Net Amount", { align: "right" }),
+      defineCol("netAmount", "Taxable Value", { align: "right" }),
       defineCol("tax", "Tax", { align: "right" }),
-      defineCol("grandTotal", "Grand Total", { align: "right" }),
+      defineCol("grandTotal", "Total", { align: "right" }),
       defineCol("status", "Status"),
     ],
     fetchRows: paginatedReportFetcher(
@@ -98,10 +99,10 @@ const exportRegistry: Record<string, ExportConfig> = {
       defineCol("date", "Date"),
       defineCol("vendor", "Vendor"),
       defineCol("warehouse", "Warehouse"),
-      defineCol("netAmount", "Net Amount", { align: "right" }),
+      defineCol("netAmount", "Taxable Value", { align: "right" }),
       defineCol("sgst", "SGST", { align: "right" }),
       defineCol("cgst", "CGST", { align: "right" }),
-      defineCol("grandTotal", "Grand Total", { align: "right" }),
+      defineCol("grandTotal", "Total", { align: "right" }),
       defineCol("status", "Status"),
     ],
     fetchRows: paginatedReportFetcher(
@@ -256,6 +257,7 @@ const exportRegistry: Record<string, ExportConfig> = {
       defineCol("invoiceNo", "Invoice No"),
       defineCol("date", "Date"),
       defineCol("item", "Item"),
+      defineCol("hsn", "HSN"),
       defineCol("type", "Type"),
       defineCol("customer", "Customer"),
       defineCol("priceLevel", "Price Level"),
@@ -273,6 +275,7 @@ const exportRegistry: Record<string, ExportConfig> = {
         invoiceNo: row.invoiceNo,
         date: fmtExportDate(row.invoiceDate),
         item: row.itemName ?? "",
+        hsn: row.hsn ?? "",
         type: row.salesType,
         customer: row.customer?.name ?? "",
         priceLevel: row.priceLevel?.name ?? "",
@@ -294,6 +297,7 @@ const exportRegistry: Record<string, ExportConfig> = {
       defineCol("invoiceNo", "Invoice No"),
       defineCol("date", "Date"),
       defineCol("item", "Item"),
+      defineCol("hsn", "HSN"),
       defineCol("vendor", "Vendor"),
       defineCol("warehouse", "Warehouse"),
       defineCol("rate", "Rate", { align: "right" }),
@@ -309,6 +313,7 @@ const exportRegistry: Record<string, ExportConfig> = {
         invoiceNo: row.invoiceNo,
         date: fmtExportDate(row.purchaseDate),
         item: row.itemName ?? "",
+        hsn: row.hsn ?? "",
         vendor: row.vendor?.name ?? "",
         warehouse: row.warehouse?.name ?? "",
         rate: fmtExportMoney(row.rate),
@@ -388,10 +393,10 @@ const exportRegistry: Record<string, ExportConfig> = {
       defineCol("salesType", "Type"),
       defineCol("customer", "Customer"),
       defineCol("originalInvoiceNo", "Original Invoice"),
-      defineCol("netAmount", "Net Amount", { align: "right" }),
+      defineCol("netAmount", "Taxable Value", { align: "right" }),
       defineCol("sgst", "SGST", { align: "right" }),
       defineCol("cgst", "CGST", { align: "right" }),
-      defineCol("grandTotal", "Grand Total", { align: "right" }),
+      defineCol("grandTotal", "Total", { align: "right" }),
       defineCol("status", "Status"),
     ],
     fetchRows: paginatedReportFetcher(
@@ -422,10 +427,10 @@ const exportRegistry: Record<string, ExportConfig> = {
       defineCol("returnDate", "Date"),
       defineCol("vendor", "Vendor"),
       defineCol("originalInvoiceNo", "Original Invoice"),
-      defineCol("netAmount", "Net Amount", { align: "right" }),
+      defineCol("netAmount", "Taxable Value", { align: "right" }),
       defineCol("sgst", "SGST", { align: "right" }),
       defineCol("cgst", "CGST", { align: "right" }),
-      defineCol("grandTotal", "Grand Total", { align: "right" }),
+      defineCol("grandTotal", "Total", { align: "right" }),
       defineCol("status", "Status"),
     ],
     fetchRows: paginatedReportFetcher(
@@ -561,7 +566,7 @@ const exportRegistry: Record<string, ExportConfig> = {
       defineCol("type", "Type"),
       defineCol("customer", "Customer"),
       defineCol("priceLevel", "Price Level"),
-      defineCol("grandTotal", "Grand Total", { align: "right" }),
+      defineCol("grandTotal", "Total", { align: "right" }),
       defineCol("received", "Received", { align: "right" }),
       defineCol("balance", "Balance", { align: "right" }),
       defineCol("payment", "Payment"),
@@ -586,6 +591,34 @@ const exportRegistry: Record<string, ExportConfig> = {
           status: inv.status,
         };
       }
+    ),
+  },
+
+  quotations: {
+    title: "Quotations",
+    columns: [
+      defineCol("slno", "Sl No"),
+      defineCol("quotationNo", "Quotation No"),
+      defineCol("date", "Date"),
+      defineCol("validUntil", "Valid Until"),
+      defineCol("type", "Type"),
+      defineCol("customer", "Customer"),
+      defineCol("priceLevel", "Price Level"),
+      defineCol("grandTotal", "Total", { align: "right" }),
+      defineCol("status", "Status"),
+    ],
+    fetchRows: paginatedListFetcher(
+      (p) => quotationService.getAll(p),
+      (q) => ({
+        quotationNo: q.quotationNo,
+        date: fmtExportDate(q.quotationDate),
+        validUntil: q.validUntil ? fmtExportDate(q.validUntil) : "—",
+        type: q.salesType,
+        customer: resolveCustomerName(q),
+        priceLevel: q.priceLevelSnapshot?.name ?? "",
+        grandTotal: fmtExportMoney(q.grandTotal),
+        status: q.status,
+      })
     ),
   },
 
@@ -647,7 +680,7 @@ const exportRegistry: Record<string, ExportConfig> = {
       defineCol("vendorInvoiceNo", "Vendor Invoice No"),
       defineCol("date", "Date"),
       defineCol("vendor", "Vendor"),
-      defineCol("grandTotal", "Grand Total", { align: "right" }),
+      defineCol("grandTotal", "Total", { align: "right" }),
       defineCol("status", "Status"),
     ],
     fetchRows: paginatedListFetcher(

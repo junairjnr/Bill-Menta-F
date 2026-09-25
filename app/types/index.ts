@@ -447,6 +447,13 @@ export interface PurchaseItemRow {
 export interface InvoicePaymentLine {
   paymentMode: string;
   bankAccountId?: string;
+  bankAccountSnapshot?: {
+    accountName?: string;
+    bankName?: string;
+    accountNumber?: string;
+    ifscCode?: string;
+    upiId?: string;
+  };
   amount: number | string;
   referenceNo?: string;
 }
@@ -461,6 +468,8 @@ export interface CreatePurchasePayload {
   attachments?: DocumentAttachment[];
   payments?: InvoicePaymentLine[];
   paidAmount?: number;
+  cashDiscountPercent?: number;
+  cashDiscountAmt?: number;
 }
 
 export interface PurchaseInvoice {
@@ -485,6 +494,9 @@ export interface PurchaseInvoice {
   totalTax: number;
   total: number;
   roundOff: number;
+  billTotal?: number;
+  cashDiscountPercent?: number;
+  cashDiscountAmt?: number;
   grandTotal: number;
   paidAmount?: number;
   balanceAmount?: number;
@@ -515,6 +527,11 @@ export interface SalesItemRow {
   cgst: number;
   igst?: number;
   total: number; // taxableValue + sgst + cgst + igst
+  rateManual?: boolean; // F2 — override rate for this line only
+  taxManual?: boolean; // F3 — override GST slab for this line only
+  taxMasterId?: string;
+  defaultTaxPercent?: number; // product default — restored when F3 toggles off
+  defaultTaxMasterId?: string;
 }
 
 export type PaymentMode =
@@ -534,8 +551,8 @@ export interface SalesInvoice {
   invoiceNo: string;
   invoiceDate: string;
   salesType: "retail" | "wholesale";
-  priceLevelId: { _id: string; name: string; taxPercent: number };
-  priceLevelSnapshot: { name: string; taxPercent: number };
+  priceLevelId?: { _id: string; name: string; taxPercent: number };
+  priceLevelSnapshot?: { name: string; taxPercent: number };
   customerId: { _id: string; name: string; phone: string };
   customerSnapshot: {
     name: string;
@@ -568,13 +585,14 @@ export interface SalesInvoice {
   saleMode?: "credit" | "cash";
   status: string;
   notes?: string;
+  payments?: InvoicePaymentLine[];
   createdAt: string;
 }
 
 export interface CreateSalesPayload {
   invoiceDate: string;
   salesType: "retail" | "wholesale";
-  priceLevelId: string;
+  priceLevelId?: string;
   customerId: string;
   warehouseId: string;
   items: any[];
@@ -584,6 +602,61 @@ export interface CreateSalesPayload {
   saleMode?: "credit" | "cash";
   paidAmount?: number;
   payments?: InvoicePaymentLine[];
+  quotationId?: string;
+}
+
+export interface Quotation {
+  _id: string;
+  quotationNo: string;
+  quotationDate: string;
+  validUntil?: string;
+  salesType: "retail" | "wholesale";
+  priceLevelId?: { _id: string; name: string; taxPercent: number };
+  priceLevelSnapshot?: { name: string; taxPercent: number };
+  customerId: { _id: string; name: string; phone?: string };
+  customerSnapshot: {
+    name: string;
+    gstin: string;
+    place: string;
+    state: string;
+    stateCode: string;
+    address: string;
+  };
+  warehouseId?: { _id: string; name: string; code: string };
+  items: any[];
+  netAmount: number;
+  totalSGST: number;
+  totalCGST: number;
+  totalIGST?: number;
+  totalTax: number;
+  total: number;
+  roundOff: number;
+  grandTotal: number;
+  supplierStateCode?: string;
+  placeOfSupplyStateCode?: string;
+  gstSupplyType?: "intra" | "inter";
+  lineNetAmount?: number;
+  cashDiscountPercent?: number;
+  cashDiscountAmt?: number;
+  billTotal?: number;
+  status: string;
+  notes?: string;
+  convertedToInvoiceId?: string;
+  convertedAt?: string;
+  createdAt: string;
+}
+
+export interface CreateQuotationPayload {
+  quotationDate: string;
+  validUntil?: string;
+  salesType: "retail" | "wholesale";
+  priceLevelId?: string;
+  customerId: string;
+  warehouseId?: string;
+  items: any[];
+  notes?: string;
+  cashDiscountPercent?: number;
+  cashDiscountAmt?: number;
 }
 
 // ── Purchase Return ───────────────────────────────────────────

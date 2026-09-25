@@ -137,6 +137,12 @@ export const sections: Section[] = [
             permissionKey: "sales.invoice",
           },
           {
+            name: "Quotation",
+            path: "/sales/quotation",
+            icon: <FileText size={16} />,
+            permissionKey: "sales.quotation",
+          },
+          {
             name: "Sales Return",
             path: "/sales/salesReturn",
             icon: <FileText size={16} />,

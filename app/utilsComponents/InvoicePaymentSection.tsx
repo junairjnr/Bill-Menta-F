@@ -3,11 +3,12 @@
 import Link from "next/link";
 import { CreditCard, IndianRupee } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import type { ReceiptPayment, SalesInvoice } from "@/app/types";
+import type { InvoicePaymentLine, ReceiptPayment, SalesInvoice } from "@/app/types";
 import {
   PAYMENT_MODE_LABELS,
   PAYMENT_STATUS_LABELS,
   PAYMENT_STATUS_STYLES,
+  invoicePaymentAccountLabel,
   resolveBalance,
   resolvePaymentStatus,
 } from "./paymentConstants";
@@ -16,12 +17,22 @@ import { formatDate } from "./DateFormat";
 interface InvoicePaymentSectionProps {
   invoice: SalesInvoice;
   payments?: ReceiptPayment[];
+  initialPayments?: InvoicePaymentLine[];
   isLoadingPayments?: boolean;
+}
+
+function resolvePaymentAccountLabel(payment: InvoicePaymentLine) {
+  if (payment.paymentMode === "cash") return "Cash Account";
+  const snap = payment.bankAccountSnapshot;
+  if (snap?.accountName) return snap.accountName;
+  if (snap?.bankName) return snap.bankName;
+  return invoicePaymentAccountLabel(payment.paymentMode);
 }
 
 export default function InvoicePaymentSection({
   invoice,
   payments = [],
+  initialPayments = [],
   isLoadingPayments,
 }: InvoicePaymentSectionProps) {
   const paidAmount = invoice.paidAmount ?? 0;
@@ -45,6 +56,10 @@ export default function InvoicePaymentSection({
       : invoice.customerId;
 
   const payUrl = `/reciept/payments/add?customerId=${customerId}&invoiceId=${invoice._id}`;
+
+  const invoicePaymentRows = initialPayments.filter(
+    (row) => Number(row.amount) > 0
+  );
 
   return (
     <div className="space-y-6">
@@ -99,6 +114,47 @@ export default function InvoicePaymentSection({
               Receive Payment
             </Link>
           </Button>
+        </div>
+      )}
+
+      {invoicePaymentRows.length > 0 && (
+        <div className="overflow-hidden rounded-xl border bg-white shadow-sm">
+          <div className="border-b px-5 py-4">
+            <h4 className="text-sm font-semibold text-gray-800">Payment at Invoice</h4>
+            <p className="text-xs text-gray-400">
+              Amount received when invoice {invoice.invoiceNo} was created
+            </p>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead className="bg-gray-50 text-xs text-gray-500">
+                <tr>
+                  <th className="px-5 py-3 text-left font-medium">Method</th>
+                  <th className="px-4 py-3 text-left font-medium">Account</th>
+                  <th className="px-4 py-3 text-left font-medium">Reference</th>
+                  <th className="px-4 py-3 text-right font-medium">Amount</th>
+                </tr>
+              </thead>
+              <tbody>
+                {invoicePaymentRows.map((payment, index) => (
+                  <tr key={`invoice-payment-${index}`} className="border-t hover:bg-gray-50">
+                    <td className="px-5 py-3 text-gray-700">
+                      {PAYMENT_MODE_LABELS[payment.paymentMode] ?? payment.paymentMode}
+                    </td>
+                    <td className="px-4 py-3 text-gray-600">
+                      {resolvePaymentAccountLabel(payment)}
+                    </td>
+                    <td className="px-4 py-3 text-gray-500">
+                      {payment.referenceNo?.trim() || "—"}
+                    </td>
+                    <td className="px-4 py-3 text-right font-semibold text-green-700">
+                      ₹ {(Number(payment.amount) || 0).toFixed(2)}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
       )}
 

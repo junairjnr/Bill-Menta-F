@@ -13,7 +13,7 @@ import {
   FilterSelect, FilterInput,
 } from "@/app/utilsComponents/report-ui";
 
-const COLS = ["#", "Invoice No", "Date", "Vendor", "Warehouse", "Net Amount", "SGST", "CGST", "Grand Total", "Status"].map((l, i) => ({
+const COLS = ["#", "Invoice No", "Date", "Vendor", "Warehouse", "Taxable Value", "SGST", "CGST", "Total", "Status"].map((l, i) => ({
   label: l, align: i >= 5 && i <= 8 ? "right" as const : "left" as const,
 }));
 
@@ -76,11 +76,11 @@ export default function PurchaseReportPage() {
       summaryLoading={isFetching && !isLoading}
       summary={data?.summary ? [
         { label: "Invoices", value: data.summary.totalInvoices },
-        { label: "Net Amount", value: fmtMoney(data.summary.totalNetAmount) },
+        { label: "Taxable Value", value: fmtMoney(data.summary.totalNetAmount) },
         { label: "SGST", value: fmtMoney(data.summary.totalSGST) },
         { label: "CGST", value: fmtMoney(data.summary.totalCGST) },
         { label: "Tax", value: fmtMoney(data.summary.totalTax) },
-        { label: "Grand Total", value: fmtMoney(data.summary.grandTotal), highlight: true },
+        { label: "Total Value", value: fmtMoney(data.summary.grandTotal), highlight: true },
       ] : undefined}
       filterInline={
         <FilterSelect

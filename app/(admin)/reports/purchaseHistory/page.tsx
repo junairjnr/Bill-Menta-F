@@ -25,9 +25,9 @@ const COLS = [
   "Invoice No",
   "Date",
   "Item",
+  "HSN",
   "Vendor",
   "Warehouse",
-  "HSN",
   "Qty",
   "Rate",
   "Taxable Value",
@@ -202,11 +202,11 @@ export default function PurchaseHistoryPage() {
                 {fmtDate(row.purchaseDate)}
               </td>
               <td className="px-4 py-3 text-gray-700">{row.itemName || "—"}</td>
+              <td className="px-4 py-3 text-gray-500">{row.hsn || "—"}</td>
               <td className="px-4 py-3">{row.vendor?.name || "—"}</td>
               <td className="px-4 py-3 text-gray-500">
                 {(row.warehouse as { name?: string })?.name || "—"}
               </td>
-              <td className="px-4 py-3 text-gray-500">{row.hsn || "—"}</td>
               <td className="px-4 py-3 text-right font-medium">{row.qty}</td>
               <td className="px-4 py-3 text-right">{fmtMoney(row.rate)}</td>
               <td className="px-4 py-3 text-right">

@@ -27,11 +27,12 @@ const COLS = [
   "Date",
   "Original Invoice",
   "Item",
+  "HSN",
   "Type",
   "Customer",
   "Rate",
   "Qty",
-  "Taxable",
+  "Taxable Value",
   "SGST",
   "CGST",
   "Total",
@@ -185,6 +186,7 @@ export default function SalesReturnHistoryPage() {
               <td className="px-4 py-3 text-gray-600">{fmtDate(row.returnDate)}</td>
               <td className="px-4 py-3 text-gray-500">{row.originalInvoiceNo}</td>
               <td className="px-4 py-3">{row.itemName || "—"}</td>
+              <td className="px-4 py-3 text-gray-500">{row.hsn || "—"}</td>
               <td className="px-4 py-3"><StatusBadge status={row.salesType} /></td>
               <td className="px-4 py-3">{row.customer?.name || "—"}</td>
               <td className="px-4 py-3 text-right">{fmtMoney(row.rate)}</td>

@@ -126,7 +126,7 @@ const ProductPage = () => {
               <tr>
                 <th className="px-5 py-3 text-left">#</th>
                 <th className="px-5 py-3 text-left">Name</th>
-                <th className="px-5 py-3 text-left">Code</th>
+                <th className="px-5 py-3 text-left">HSN Code</th>
                 <th className="px-5 py-3 text-left">Unit</th>
                 <th className="px-5 py-3 text-left">Category</th>
                 {/* <th className="px-5 py-3 text-left">Tax Percentage</th> */}
@@ -151,8 +151,10 @@ const ProductPage = () => {
 
                     {/* Name */}
                     <td className="px-5 py-4 font-medium">{item.name}</td>
-                    {/* Code */}
-                    <td className="px-5 py-4 font-medium">{item?.code}</td>
+                    {/* HSN Code */}
+                    <td className="px-5 py-4 font-medium">
+                      {item?.hsnCode || "—"}
+                    </td>
                     {/* Unit */}
                     <td className="px-5 py-4 font-medium">
                       {item.uomId?.name}

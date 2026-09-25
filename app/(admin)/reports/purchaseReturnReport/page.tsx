@@ -27,10 +27,10 @@ const COLS = [
   "Date",
   "Vendor",
   "Original Invoice",
-  "Net Amount",
+  "Taxable Value",
   "SGST",
   "CGST",
-  "Grand Total",
+  "Total",
   "Status",
 ].map((l, i) => ({
   label: l,
@@ -96,10 +96,10 @@ export default function PurchaseReturnReportPage() {
         data?.summary
           ? [
               { label: "Returns", value: data.summary.totalReturns },
-              { label: "Net Amount", value: fmtMoney(data.summary.totalNetAmount) },
+              { label: "Taxable Value", value: fmtMoney(data.summary.totalNetAmount) },
               { label: "SGST", value: fmtMoney(data.summary.totalSGST) },
               { label: "CGST", value: fmtMoney(data.summary.totalCGST) },
-              { label: "Grand Total", value: fmtMoney(data.summary.grandTotal), highlight: true },
+              { label: "Total Value", value: fmtMoney(data.summary.grandTotal), highlight: true },
             ]
           : undefined
       }

@@ -1,13 +1,13 @@
 "use client";
 
 import { useParams, useRouter } from "next/navigation";
-import { Printer, RotateCcw } from "lucide-react";
+import { RotateCcw } from "lucide-react";
 import BackPanel from "@/app/utilsComponents/BackPanel";
 import ViewSection from "@/app/utilsComponents/ViewSection";
 import ViewField from "@/app/utilsComponents/ViewField";
 import { usePurchaseInvoice } from "@/app/hooks/purchaseHooks/usePurchaseInvoice";
 import { amountInWords } from "@/app/utilsComponents/AmountInWords";
-import { footerReturnBtn, printFooterButton } from "@/app/utilsComponents/form-footer";
+import { footerReturnBtn } from "@/app/utilsComponents/form-footer";
 import { invoiceItemsTableClass, invoiceViewSummaryPanelClass, invoiceSummaryGrandTotalClass } from "@/app/utilsComponents/report-ui";
 import { DocumentAttachmentsView } from "@/app/utilsComponents/DocumentAttachments";
 
@@ -45,6 +45,9 @@ export default function PurchaseViewPage() {
     );
   }
 
+  const cashDiscountAmt = invoice.cashDiscountAmt ?? 0;
+  const billTotal = invoice.billTotal ?? invoice.grandTotal + cashDiscountAmt;
+
   return (
     <BackPanel
       tabs={TABS}
@@ -60,10 +63,6 @@ export default function PurchaseViewPage() {
               },
             ]
           : []),
-        // {
-        //   ...printFooterButton(() => window.print()),
-        //   icon: <Printer size={14} />,
-        // },
       ]}
     >
       <div className="space-y-6">
@@ -186,7 +185,7 @@ export default function PurchaseViewPage() {
           <div className="flex justify-end">
             <div className={invoiceViewSummaryPanelClass}>
               <div className="flex justify-between border-b py-1.5 text-gray-600">
-                <span>Net Amount</span>
+                <span>Taxable Value</span>
                 <span className="font-medium">₹ {invoice.netAmount.toFixed(2)}</span>
               </div>
               <div className="flex justify-between border-b py-1.5 text-gray-600">
@@ -212,6 +211,16 @@ export default function PurchaseViewPage() {
                   {invoice.roundOff.toFixed(2)}
                 </span>
               </div>
+              <div className="flex justify-between border-b py-1.5 font-semibold text-gray-800">
+                <span>Bill Total</span>
+                <span>₹ {billTotal.toFixed(2)}</span>
+              </div>
+              {cashDiscountAmt > 0 && (
+                <div className="flex justify-between border-b py-1.5 text-red-600">
+                  <span>Cash Discount</span>
+                  <span>- ₹ {cashDiscountAmt.toFixed(2)}</span>
+                </div>
+              )}
               <div className={invoiceSummaryGrandTotalClass}>
                 <span>Grand Total</span>
                 <span>₹ {invoice.grandTotal.toFixed(2)}</span>

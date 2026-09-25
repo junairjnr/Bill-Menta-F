@@ -2,10 +2,9 @@
 
 import { Suspense } from "react";
 import BackPanel from "@/app/utilsComponents/BackPanel";
-import { salesInvoiceFormFooterButtons } from "@/app/utilsComponents/form-footer";
+import { quotationFormFooterButtons } from "@/app/utilsComponents/form-footer";
 import { useFormPageFooter } from "@/app/hooks/useFormPageFooter";
-import SalesInvoiceForm from "../SalesInvoiceForm";
-import React from "react";
+import QuotationForm from "../QuotationForm";
 
 function FormFallback() {
   return (
@@ -15,26 +14,24 @@ function FormFallback() {
   );
 }
 
-function SalesInvoiceAddForm() {
+function QuotationAddForm() {
   const { buttons, onPendingChange } = useFormPageFooter(
-    salesInvoiceFormFooterButtons
+    quotationFormFooterButtons
   );
 
   return (
     <BackPanel buttons={buttons}>
       <div className="flex h-full">
-        <SalesInvoiceForm onPendingChange={onPendingChange} />
+        <QuotationForm onPendingChange={onPendingChange} />
       </div>
     </BackPanel>
   );
 }
 
-const SalesInvoiceAdd = () => {
+export default function QuotationAddPage() {
   return (
     <Suspense fallback={<FormFallback />}>
-      <SalesInvoiceAddForm />
+      <QuotationAddForm />
     </Suspense>
   );
-};
-
-export default React.memo(SalesInvoiceAdd);
+}

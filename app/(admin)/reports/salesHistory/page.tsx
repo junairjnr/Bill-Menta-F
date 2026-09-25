@@ -26,6 +26,7 @@ const COLS = [
   "Invoice No",
   "Date",
   "Item",
+  "HSN",
   "Type",
   "Customer",
   "Price Level",
@@ -223,6 +224,7 @@ export default function SalesHistoryPage() {
                 {fmtDate(row.invoiceDate)}
               </td>
               <td className="px-4 py-3 text-gray-700">{row.itemName || "—"}</td>
+              <td className="px-4 py-3 text-gray-500">{row.hsn || "—"}</td>
               <td className="px-4 py-3">
                 <StatusBadge status={row.salesType} />
               </td>

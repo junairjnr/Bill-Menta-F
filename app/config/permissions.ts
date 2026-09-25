@@ -11,6 +11,7 @@ export type ViewPermissionKey =
   | "master.warehouse"
   | "master.bank"
   | "sales.invoice"
+  | "sales.quotation"
   | "sales.return"
   | "purchase.invoice"
   | "purchase.return"
@@ -60,6 +61,7 @@ export const PATH_PERMISSION_MAP: Record<string, ViewPermissionKey> = {
   "/master/warehouse": "master.warehouse",
   "/master/bank": "master.bank",
   "/sales/salesInvoice": "sales.invoice",
+  "/sales/quotation": "sales.quotation",
   "/sales/salesReturn": "sales.return",
   "/purchase/purchaseInvoice": "purchase.invoice",
   "/purchase/purchaseReturn": "purchase.return",

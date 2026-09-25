@@ -28,10 +28,10 @@ const COLS = [
   "Type",
   "Customer",
   "Price Level",
-  "Net Amount",
+  "Taxable Value",
   "SGST",
   "CGST",
-  "Grand Total",
+  "Total",
   "Status",
 ].map((l, i) => ({
   label: l,
@@ -113,14 +113,14 @@ export default function SalesReportPage() {
               { label: "Retail", value: data.summary.retailCount },
               { label: "Wholesale", value: data.summary.wholesaleCount },
               {
-                label: "Net Amount",
+                label: "Taxable Value",
                 value: fmtMoney(data.summary.totalNetAmount),
               },
               { label: "SGST", value: fmtMoney(data.summary.totalSGST) },
               { label: "CGST", value: fmtMoney(data.summary.totalCGST) },
               { label: "Tax", value: fmtMoney(data.summary.totalTax) },
               {
-                label: "Grand Total",
+                label: "Total Value",
                 value: fmtMoney(data.summary.grandTotal),
                 highlight: true,
               },
@@ -244,8 +244,9 @@ export default function SalesReportPage() {
                   : inv.customerSnapshot?.name}
               </td>
               <td className="px-4 py-3 text-gray-500">
-                {inv.priceLevelSnapshot?.name} (
-                {inv.priceLevelSnapshot?.taxPercent}%)
+                {inv.priceLevelSnapshot?.name
+                  ? `${inv.priceLevelSnapshot.name} (${inv.priceLevelSnapshot.taxPercent}%)`
+                  : "—"}
               </td>
               <td className="px-4 py-3 text-right">
                 {fmtMoney(inv.netAmount)}

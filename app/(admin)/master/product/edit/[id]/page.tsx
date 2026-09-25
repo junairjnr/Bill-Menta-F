@@ -6,7 +6,7 @@ import BackPanel from "@/app/utilsComponents/BackPanel";
 import { productFormFooterButtons } from "@/app/utilsComponents/form-footer";
 import ProductForm from "../../ProductForm";
 import { useItem } from "@/app/hooks/masterHooks/itemHook/useItem";
-import { itemPurchaseRate, itemSalesRate } from "@/app/utils/itemRates";
+import { itemPurchaseRate, itemSalesRate, profitPercentFromRates } from "@/app/utils/itemRates";
 import React from "react";
 
 const EditProduct = () => {
@@ -38,6 +38,8 @@ const EditProduct = () => {
               hsnCode: data.hsnCode ?? "",
               salesRate: itemSalesRate(data) || "",
               purchaseRate: itemPurchaseRate(data) || "",
+              profitPercent:
+                profitPercentFromRates(itemPurchaseRate(data), itemSalesRate(data)) || "",
               price: itemSalesRate(data) || "",
               taxPercent: data?.taxPercent,
               taxMasterId:

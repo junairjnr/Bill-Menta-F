@@ -1,658 +1,3 @@
-// "use client";
-
-// import { useState, useCallback, useEffect } from "react";
-// import { useFormik } from "formik";
-// import * as Yup from "yup";
-// import { useRouter } from "next/navigation";
-// import { Trash2, Plus, Form } from "lucide-react";
-// import { Button } from "@/components/ui/button";
-// import PageHeader from "@/app/utilsComponents/PageHeader";
-// import { PurchaseItemRow } from "@/app/types";
-// import { useCreatePurchaseInvoice } from "@/app/hooks/purchaseHooks/usePurchaseInvoice";
-// import { useCustomers } from "@/app/hooks/masterHooks/customerHook/useCustomer";
-// import { useWarehouses } from "@/app/hooks/warehouseHooks/useWarehouse";
-// import { useItems } from "@/app/hooks/masterHooks/itemHook/useItem";
-// import { amountInWords } from "../../utilDatas/AmountInWords";
-// import FormText from "@/app/formComponents/FormText";
-// import FormDate from "@/app/formComponents/FormDate";
-// import FormSelect from "@/app/formComponents/FormSelect";
-// import FormNumber from "@/app/formComponents/FormNumber";
-// import { useAuthStore } from "@/app/store/auth/auth.store";
-// // import { useCreatePurchaseInvoice } from "@/hooks/usePurchase";
-// // import { useCustomers }  from "@/hooks/useMasters";
-// // import { useWarehouses } from "@/hooks/useWarehouse";
-// // import { useItems }      from "@/hooks/useMasters";
-// // import { amountInWords } from "@/utils/amountInWords";
-// // import { PurchaseItemRow } from "@/types";
-
-// // ── Empty item row ────────────────────────────────────────────
-// const emptyRow = (slNo: number): PurchaseItemRow => ({
-//   slNo,
-//   itemId: "",
-//   itemName: "",
-//   hsn: "",
-//   uomId: "",
-//   uomName: "",
-//   rate: "",
-//   qty: "",
-//   taxableValue: 0,
-//   taxPercent: 0,
-//   sgst: 0,
-//   cgst: 0,
-//   total: 0,
-// });
-
-// // ── Block negative keys ───────────────────────────────────────
-// const blockNegative = (e: React.KeyboardEvent<HTMLInputElement>) => {
-//   if (["-", "e", "E", "+"].includes(e.key)) e.preventDefault();
-// };
-
-// export default function PurchaseInvoiceForm() {
-//   const router = useRouter();
-//   const user = useAuthStore((s) => s.user);
-//   // const loginResponse = localStorage.getItem("USER");
-//   // const loginData = loginResponse ? JSON?.parse(loginResponse) : null;
-
-//   const { mutate: create, isPending } = useCreatePurchaseInvoice();
-
-//   // ── Data fetches ──────────────────────────────────────────
-
-//   const { data: vendorData } = useCustomers({ limit: DROPDOWN_LIMIT, isActive: true });
-//   const { data: warehouseData } = useWarehouses({
-//     limit: PAGE_SIZE,
-//     branchId: user?.branchId || "",
-//   });
-//   const { data: itemData } = useItems({ limit: DROPDOWN_LIMIT, isActive: true });
-
-//   const vendors = vendorData?.data?.filter((c) => c.type === "purchase") ?? [];
-//   const warehouses = warehouseData ?? [];
-//   const items = itemData?.data ?? [];
-
-//   // ── Selected vendor details ───────────────────────────────
-//   const [vendorDetails, setVendorDetails] = useState({
-//     gstin: "",
-//     place: "",
-//     state: "",
-//     stateCode: "",
-//     address: "",
-//   });
-
-//   useEffect(()=>{
-//   console.log("User from store:", user);
-
-//   },[user])
-
-//   // ── Item rows state ───────────────────────────────────────
-//   const [rows, setRows] = useState<PurchaseItemRow[]>([emptyRow(1)]);
-
-//   // ── Calculated totals ─────────────────────────────────────
-//   const netAmount = rows.reduce((s, r) => s + r.taxableValue, 0);
-//   const totalSGST = rows.reduce((s, r) => s + r.sgst, 0);
-//   const totalCGST = rows.reduce((s, r) => s + r.cgst, 0);
-//   const totalTax = totalSGST + totalCGST;
-//   const total = netAmount + totalTax;
-//   const grandTotal = Math.round(total);
-//   const roundOff = Number((grandTotal - total).toFixed(2));
-
-//   // ── Handle vendor select ──────────────────────────────────
-//   const handleVendorChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-//     formik.setFieldValue("vendorId", e.target.value);
-//     const vendor = vendors.find((v) => v._id === e.target.value);
-//     if (vendor) {
-//       setVendorDetails({
-//         gstin: vendor.gstin || "",
-//         place: vendor.address?.place || "",
-//         state: vendor.address?.state || "",
-//         stateCode: vendor.address?.stateCode || "",
-//         address: [
-//           vendor.address?.line1,
-//           vendor.address?.place,
-//           vendor.address?.city,
-//         ]
-//           .filter(Boolean)
-//           .join(", "),
-//       });
-//     } else {
-//       setVendorDetails({
-//         gstin: "",
-//         place: "",
-//         state: "",
-//         stateCode: "",
-//         address: "",
-//       });
-//     }
-//   };
-
-//   // ── Handle item select in a row ───────────────────────────
-//   const handleItemSelect = (index: number, itemId: string) => {
-//     const item = items.find((i) => i._id === itemId);
-//     setRows((prev) => {
-//       const updated = [...prev];
-//       updated[index] = {
-//         ...updated[index],
-//         itemId: itemId,
-//         itemName: item?.name || "",
-//         hsn: item?.hsnCode || "",
-//         uomId:
-//           typeof item?.uomId === "object" ? item.uomId._id : item?.uomId || "",
-//         uomName:
-//           typeof item?.uomId === "object"
-//             ? `${item.uomId.name} (${item.uomId.shortCode})`
-//             : "",
-//         taxPercent: item?.taxPercent || 0,
-//         rate: String(item?.price || ""),
-//       };
-//       return recalcRow(updated, index);
-//     });
-//   };
-
-//   // ── Handle rate or qty change ─────────────────────────────
-//   const handleRowChange = (
-//     index: number,
-//     field: "rate" | "qty" | "hsn",
-//     value: string
-//   ) => {
-//     setRows((prev) => {
-//       const updated = [...prev];
-//       updated[index] = { ...updated[index], [field]: value };
-//       if (field === "rate" || field === "qty") {
-//         return recalcRow(updated, index);
-//       }
-//       return updated;
-//     });
-//   };
-
-//   // ── Recalculate a single row ──────────────────────────────
-//   const recalcRow = (
-//     rows: PurchaseItemRow[],
-//     index: number
-//   ): PurchaseItemRow[] => {
-//     const row = rows[index];
-//     const qty = Number(row.qty) || 0;
-//     const rate = Number(row.rate) || 0;
-//     const taxableValue = Number((qty * rate).toFixed(2));
-//     const sgst = Number(((taxableValue * row.taxPercent) / 200).toFixed(2));
-//     const cgst = Number(((taxableValue * row.taxPercent) / 200).toFixed(2));
-//     const total = Number((taxableValue + sgst + cgst).toFixed(2));
-//     rows[index] = { ...row, taxableValue, sgst, cgst, total };
-//     return rows;
-//   };
-
-//   // ── Add row ───────────────────────────────────────────────
-//   const addRow = () => {
-//     setRows((prev) => [...prev, emptyRow(prev.length + 1)]);
-//   };
-
-//   // ── Remove row ────────────────────────────────────────────
-//   const removeRow = (index: number) => {
-//     if (rows.length === 1) return; // keep at least one row
-//     setRows((prev) =>
-//       prev.filter((_, i) => i !== index).map((r, i) => ({ ...r, slNo: i + 1 }))
-//     );
-//   };
-
-//   // ── Formik ────────────────────────────────────────────────
-//   const formik = useFormik({
-//     initialValues: {
-//       vendorId: "",
-//       vendorInvoiceNo: "",
-//       purchaseDate: new Date().toISOString().split("T")[0],
-//       warehouseId: "",
-//       notes: "",
-//     },
-//     validationSchema: Yup.object({
-//       vendorId: Yup.string().required("Vendor is required"),
-//       purchaseDate: Yup.string().required("Purchase date is required"),
-//       warehouseId: Yup.string().required("Warehouse is required"),
-//     }),
-//     onSubmit: (values) => {
-//       // Validate rows
-//       const validRows = rows.filter((r) => r.itemId && r.qty && r.rate);
-//       if (validRows.length === 0) {
-//         alert("Add at least one item");
-//         return;
-//       }
-
-//       const payload = {
-//         ...values,
-//         items: validRows.map((r) => ({
-//           slNo: r.slNo,
-//           itemId: r.itemId,
-//           hsn: r.hsn,
-//           uomId: r.uomId,
-//           rate: Number(r.rate),
-//           qty: Number(r.qty),
-//           taxableValue: r.taxableValue,
-//           taxPercent: r.taxPercent,
-//           sgst: r.sgst,
-//           cgst: r.cgst,
-//           total: r.total,
-//         })),
-//       };
-
-//       create(payload, { onSuccess: () => router.push("/purchase") });
-//     },
-//   });
-
-//   const { values, errors, touched, handleChange, handleBlur, handleSubmit } =
-//     formik;
-
-//   const inputClass =
-//     "w-full border-b-2 border-gray-300 bg-transparent py-1.5 text-sm focus:outline-none focus:border-blue-600";
-
-//   return (
-//     <div className="w-full mx-auto p-5">
-//       <PageHeader
-//         title="New Purchase Invoice"
-//         description="Record a new purchase"
-//       />
-
-//       <form onSubmit={handleSubmit} className="space-y-8">
-//         {/* ── Header Section ───────────────────────────────── */}
-//         <div className="bg-white p-6 rounded-xl shadow-sm">
-//           <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-5">
-//             Invoice Details
-//           </h3>
-//           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-x-16 gap-y-6">
-//             {/* Purchase Date */}
-//             {/* <div className="flex items-center gap-4 max-w-md">
-//               <label className="w-32 text-sm font-medium text-gray-700">
-//                 <span className="text-red-500">*</span> Date
-//               </label>
-//               <div className="flex-1">
-//                 <input
-//                   type="date"
-//                   name="purchaseDate"
-//                   value={values.purchaseDate}
-//                   onChange={handleChange}
-//                   onBlur={handleBlur}
-//                   className={inputClass}
-//                 />
-//                 {touched.purchaseDate && errors.purchaseDate && (
-//                   <p className="text-red-500 text-xs mt-1">{errors.purchaseDate}</p>
-//                 )}
-//               </div>
-//             </div> */}
-//             <FormDate
-//               label="Date"
-//               name="purchaseDate"
-//               value={values.purchaseDate}
-//               required
-//               touched={touched.purchaseDate}
-//               error={errors.purchaseDate}
-//               onChange={handleChange}
-//               onBlur={handleBlur}
-//             />
-//             {/* Vendor Invoice No */}
-//             <FormText
-//               label="Vendor Invoice No"
-//               name="vendorInvoiceNo"
-//               value={values.vendorInvoiceNo}
-//               onChange={handleChange}
-//               onBlur={handleBlur}
-//               error={errors.vendorInvoiceNo}
-//               touched={touched.vendorInvoiceNo}
-//             />
-
-//             {/* Vendor Invoice No */}
-//             {/* <div className="flex items-center gap-4 max-w-md">
-//               <label className="w-32 text-sm font-medium text-gray-700">
-//                 Vendor Inv No
-//               </label>
-//               <div className="flex-1">
-//                 <input
-//                   name="vendorInvoiceNo"
-//                   value={values.vendorInvoiceNo}
-//                   onChange={handleChange}
-//                   onBlur={handleBlur}
-//                   placeholder="Supplier's invoice number"
-//                   className={inputClass}
-//                 />
-//               </div>
-//             </div> */}
-
-//             {/* Warehouse */}
-
-//             {/* <FormSelect
-//               label="Warehouse"
-//               name="warehouseId"
-//               value={values.warehouseId}
-//               onChange={handleChange}
-//               onBlur={handleBlur}
-//               error={errors.warehouseId}
-//               touched={touched.warehouseId}
-//               options={warehouses?.map((w: any) => ({
-//                 label: w.name,
-//                 value: w._id,
-//               }))}
-//             /> */}
-//           </div>
-//         </div>
-
-//         {/* ── Vendor Section ───────────────────────────────── */}
-//         <div className="bg-white p-6 rounded-xl shadow-sm">
-//           <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-5">
-//             Vendor Details
-//           </h3>
-//           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-x-16 gap-y-6">
-//             {/* Vendor Select */}
-
-//             <FormSelect
-//               label="Vendor"
-//               name="vendorId"
-//               value={values.vendorId}
-//               options={vendors.map((v) => ({ label: v.name, value: v._id }))}
-//               onChange={handleVendorChange}
-//               onBlur={handleBlur}
-//               error={errors.vendorId}
-//               touched={touched.vendorId}
-//             />
-
-//             {/* GSTIN — auto filled */}
-
-//             <FormText
-//               label="GSTIN"
-//               name="gstin"
-//               value={vendorDetails.gstin}
-//               readOnly
-//               onChange={handleChange}
-//               onBlur={handleBlur}
-//               // error={errors.gstin}
-//               // touched={touched.gstin}
-//             />
-
-//             {/* Place — auto filled */}
-//             <FormText
-//               label="Place"
-//               name="place"
-//               value={vendorDetails.place}
-//               readOnly
-//               onChange={handleChange}
-//               onBlur={handleBlur}
-//               // error={errors.place}
-//               // touched={touched.place}
-//             />
-
-//             {/* State — auto filled */}
-
-//             <FormText
-//               label="State"
-//               name="state"
-//               value={vendorDetails.state}
-//               readOnly
-//               onChange={handleChange}
-//               onBlur={handleBlur}
-//               // error={errors.state}
-//               // touched={touched.state}
-//             />
-
-//             {/* State Code — auto filled */}
-//             <FormText
-//               label="State Code"
-//               name="stateCode"
-//               value={vendorDetails.stateCode}
-//               readOnly
-//               onChange={handleChange}
-//               onBlur={handleBlur}
-//               // error={errors.stateCode}
-//               // touched={touched.stateCode}
-//             />
-
-//             {/* Address — auto filled */}
-//             <FormText
-//               label="Address"
-//               name="address"
-//               value={vendorDetails.address}
-//               readOnly
-//               onChange={handleChange}
-//               onBlur={handleBlur}
-//               // error={errors.address}
-//               // touched={touched.address}
-//             />
-//           </div>
-//         </div>
-
-//         {/* ── Items Table ──────────────────────────────────── */}
-//         <div className="bg-white rounded-xl shadow-sm overflow-hidden">
-//           <div className="p-4 border-b flex justify-between items-center">
-//             <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-widest">
-//               Items
-//             </h3>
-//             <Button
-//               type="button"
-//               onClick={addRow}
-//               className="flex items-center gap-1 px-3 py-1.5 bg-black text-white text-xs rounded-md hover:bg-gray-800"
-//             >
-//               <Plus size={12} /> Add Row
-//             </Button>
-//           </div>
-
-//           <div className="overflow-x-auto">
-//             <table className="w-full text-sm">
-//               <thead className="bg-gray-50 text-gray-600 text-xs">
-//                 <tr>
-//                   <th className="px-3 py-3 text-left w-10">#</th>
-//                   <th className="px-3 py-3 text-left min-w-[160px]">Item</th>
-//                   <th className="px-3 py-3 text-left w-24">HSN</th>
-//                   <th className="px-3 py-3 text-left w-24">UOM</th>
-//                   <th className="px-3 py-3 text-right w-24">Rate</th>
-//                   <th className="px-3 py-3 text-right w-20">Qty</th>
-//                   <th className="px-3 py-3 text-right w-28">Taxable Value</th>
-//                   <th className="px-3 py-3 text-right w-16">Tax%</th>
-//                   <th className="px-3 py-3 text-right w-24">SGST</th>
-//                   <th className="px-3 py-3 text-right w-24">CGST</th>
-//                   <th className="px-3 py-3 text-right w-28">Total</th>
-//                   <th className="px-3 py-3 w-10"></th>
-//                 </tr>
-//               </thead>
-//               <tbody>
-//                 {rows.map((row, index) => (
-//                   <tr key={index} className="border-t hover:bg-gray-50">
-//                     {/* Sl No */}
-//                     <td className="px-3 py-2 text-gray-400 text-xs">
-//                       {row.slNo}
-//                     </td>
-
-//                     {/* Item Select */}
-//                     <td className="px-3 py-2">
-//                       <select
-//                         value={row.itemId}
-//                         onChange={(e) =>
-//                           handleItemSelect(index, e.target.value)
-//                         }
-//                         className="w-full border-b border-gray-300 bg-transparent py-1 text-sm focus:outline-none focus:border-blue-600"
-//                       >
-//                         <option value="">Select item</option>
-//                         {items.map((item: any) => (
-//                           <option key={item._id} value={item._id}>
-//                             {item.name}
-//                           </option>
-//                         ))}
-//                       </select>
-//                     </td>
-
-//                     {/* HSN */}
-//                     <td className="px-3 py-2">
-//                       <input
-//                         value={row.hsn}
-//                         onChange={(e) =>
-//                           handleRowChange(index, "hsn", e.target.value)
-//                         }
-//                         placeholder="HSN"
-//                         className="w-full border-b border-gray-300 bg-transparent py-1 text-sm focus:outline-none focus:border-blue-600"
-//                       />
-//                     </td>
-
-//                     {/* UOM — auto filled, disabled */}
-//                     <td className="px-3 py-2">
-//                       <input
-//                         value={row.uomName}
-//                         readOnly
-//                         className="w-full border-b border-gray-200 bg-transparent py-1 text-sm text-gray-500 cursor-not-allowed"
-//                       />
-//                     </td>
-
-//                     {/* Rate */}
-//                     <td className="px-3 py-2">
-//                       <input
-//                         type="number"
-//                         value={row.rate}
-//                         onChange={(e) =>
-//                           handleRowChange(index, "rate", e.target.value)
-//                         }
-//                         onKeyDown={blockNegative}
-//                         min="0"
-//                         step="0.01"
-//                         placeholder="0.00"
-//                         className="w-full border-b border-gray-300 bg-transparent py-1 text-sm text-right focus:outline-none focus:border-blue-600"
-//                       />
-//                     </td>
-
-//                     {/* Qty */}
-//                     <td className="px-3 py-2">
-//                       <input
-//                         type="number"
-//                         value={row.qty}
-//                         onChange={(e) =>
-//                           handleRowChange(index, "qty", e.target.value)
-//                         }
-//                         onKeyDown={blockNegative}
-//                         min="0"
-//                         step="0.01"
-//                         placeholder="0"
-//                         className="w-full border-b border-gray-300 bg-transparent py-1 text-sm text-right focus:outline-none focus:border-blue-600"
-//                       />
-//                     </td>
-
-//                     {/* Taxable Value — auto */}
-//                     <td className="px-3 py-2 text-right text-gray-700">
-//                       {row.taxableValue.toFixed(2)}
-//                     </td>
-
-//                     {/* Tax% — auto */}
-//                     <td className="px-3 py-2 text-right text-gray-500 text-xs">
-//                       {row.taxPercent}%
-//                     </td>
-
-//                     {/* SGST — auto */}
-//                     <td className="px-3 py-2 text-right text-gray-700">
-//                       {row.sgst.toFixed(2)}
-//                     </td>
-
-//                     {/* CGST — auto */}
-//                     <td className="px-3 py-2 text-right text-gray-700">
-//                       {row.cgst.toFixed(2)}
-//                     </td>
-
-//                     {/* Total — auto */}
-//                     <td className="px-3 py-2 text-right font-medium text-gray-800">
-//                       {row.total.toFixed(2)}
-//                     </td>
-
-//                     {/* Remove */}
-//                     <td className="px-3 py-2">
-//                       <button
-//                         type="button"
-//                         onClick={() => removeRow(index)}
-//                         disabled={rows.length === 1}
-//                         className="text-red-400 hover:text-red-600 disabled:opacity-20"
-//                       >
-//                         <Trash2 size={14} />
-//                       </button>
-//                     </td>
-//                   </tr>
-//                 ))}
-//               </tbody>
-//             </table>
-//           </div>
-
-//           {/* ── Summary ─────────────────────────────────────── */}
-//           <div className="flex justify-end p-6 border-t">
-//             <div className="w-full max-w-sm space-y-2 text-sm">
-//               <div className="flex justify-between text-gray-600">
-//                 <span>Net Amount</span>
-//                 <span>₹ {netAmount.toFixed(2)}</span>
-//               </div>
-
-//               <div className="flex justify-between text-gray-600">
-//                 <span>Total SGST</span>
-//                 <span>₹ {totalSGST.toFixed(2)}</span>
-//               </div>
-
-//               <div className="flex justify-between text-gray-600">
-//                 <span>Total CGST</span>
-//                 <span>₹ {totalCGST.toFixed(2)}</span>
-//               </div>
-
-//               <div className="flex justify-between text-gray-600">
-//                 <span>Total Tax</span>
-//                 <span>₹ {totalTax.toFixed(2)}</span>
-//               </div>
-
-//               <div className="flex justify-between text-gray-700 font-medium border-t pt-2">
-//                 <span>Total</span>
-//                 <span>₹ {total.toFixed(2)}</span>
-//               </div>
-
-//               <div className="flex justify-between text-gray-600">
-//                 <span>Round Off</span>
-//                 <span>
-//                   {roundOff >= 0 ? "+" : ""}
-//                   {roundOff.toFixed(2)}
-//                 </span>
-//               </div>
-
-//               <div className="flex justify-between text-gray-900 font-bold text-base border-t pt-2">
-//                 <span>Grand Total</span>
-//                 <span>₹ {grandTotal.toFixed(2)}</span>
-//               </div>
-
-//               <div className="pt-2 text-gray-500 text-xs italic">
-//                 {amountInWords(grandTotal)}
-//               </div>
-//             </div>
-//           </div>
-//         </div>
-
-//         {/* ── Notes + Actions ──────────────────────────────── */}
-//         <div className="bg-white p-6 rounded-xl shadow-sm">
-//           <div className="flex items-start gap-4 max-w-md">
-//             <label className="w-16 text-sm font-medium text-gray-700 pt-1">
-//               Notes
-//             </label>
-//             <textarea
-//               name="notes"
-//               value={values.notes}
-//               onChange={handleChange}
-//               placeholder="Any remarks..."
-//               rows={2}
-//               className="flex-1 border-b-2 border-gray-300 bg-transparent py-1.5 text-sm focus:outline-none focus:border-blue-600 resize-none"
-//             />
-//           </div>
-//         </div>
-
-//         {/* ── Submit ──────────────────────────────────────── */}
-//         <div className="flex justify-end gap-3">
-//           <Button
-//             type="button"
-//             onClick={() => router.back()}
-//             className="px-6 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300"
-//           >
-//             Cancel
-//           </Button>
-//           <Button
-//             type="submit"
-//             disabled={isPending}
-//             className="px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700"
-//           >
-//             {isPending ? "Saving..." : "Save Invoice"}
-//           </Button>
-//         </div>
-//       </form>
-//     </div>
-//   );
-// }
-
 "use client";
 
 import { useFormik, FieldArray, FormikProvider, getIn } from "formik";
@@ -663,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import PageHeader from "@/app/utilsComponents/PageHeader";
 import { useCreatePurchaseInvoice } from "@/app/hooks/purchaseHooks/usePurchaseInvoice";
 import { useWarehouses } from "@/app/hooks/warehouseHooks/useWarehouse";
-import { PAGE_SIZE, DROPDOWN_LIMIT, FORM_LOOKUP_LIMIT } from "@/app/config/pagination";
+import { FORM_LOOKUP_LIMIT } from "@/app/config/pagination";
 import {
   loadVendors,
   loadItems,
@@ -688,24 +33,19 @@ import { PURCHASE_INVOICE_FORM_ID } from "@/app/utilsComponents/form-footer";
 import { useInvoiceFormShortcuts } from "@/app/hooks/useInvoiceFormShortcuts";
 import InvoiceFormKeyboardHints from "@/app/utilsComponents/InvoiceFormKeyboardHints";
 import { invoiceItemsTableClass, invoiceSummaryPanelClass, invoiceSummaryGrandTotalClass } from "@/app/utilsComponents/report-ui";
-import { focusEnterNavField } from "@/app/utilsComponents/invoiceFormUtils";
+import {
+  appendMergedInvoiceRow,
+  clearPurchaseRowCalculated,
+  clearPurchaseRowQtyDependents,
+  computeInvoiceTotalsFromItems,
+  focusLastItemRow,
+} from "@/app/utilsComponents/invoiceFormUtils";
 import NextDocumentNumberField from "@/app/formComponents/NextDocumentNumberField";
 import DocumentAttachmentsField from "@/app/utilsComponents/DocumentAttachments";
 import type { DocumentAttachment } from "@/app/types";
 import { itemPurchaseRate } from "@/app/utils/itemRates";
+import { itemService } from "@/app/services/masterServices/item/item.service";
 import toast from "react-hot-toast";
-import InvoicePaymentDetailsForm, {
-  emptyInvoicePaymentRow,
-  resolvePaymentsForSubmit,
-  resolveReceivedPaidAmount,
-  sumInvoicePayments,
-  type InvoicePaymentFormRow,
-} from "@/app/utilsComponents/InvoicePaymentDetailsForm";
-import {
-  InvoicePaymentAccountSelect,
-  InvoicePaymentMethodSelect,
-} from "@/app/utilsComponents/invoicePaymentFields";
-import { DEFAULT_INVOICE_PAYMENT_MODE, needsBankAccount } from "@/app/utilsComponents/paymentConstants";
 
 // ── Empty item row ────────────────────────────────────────────
 const blockNeg = (e: React.KeyboardEvent<HTMLInputElement>) => {
@@ -786,9 +126,6 @@ export default function PurchaseInvoiceForm({
   const [productRowIndex, setProductRowIndex] = useState<number | null>(null);
   const [vendorOption, setVendorOption] = useState<SelectOption | null>(null);
   const [attachments, setAttachments] = useState<DocumentAttachment[]>([]);
-  const [payments, setPayments] = useState<InvoicePaymentFormRow[]>([
-    emptyInvoicePaymentRow(DEFAULT_INVOICE_PAYMENT_MODE),
-  ]);
   const pushRowRef = useRef<(() => void) | null>(null);
 
   const {
@@ -799,6 +136,7 @@ export default function PurchaseInvoiceForm({
     maxDate,
     handleFormKeyDown,
     dateHint,
+    keyboard,
   } = useInvoiceFormShortcuts({
     onEnterAtLastField: () => pushRowRef.current?.(),
   });
@@ -817,18 +155,13 @@ export default function PurchaseInvoiceForm({
             }
             if (!allowPastDates && value !== today) {
               return this.createError({
-                message:
-                  "Only today's date is allowed. Press Ctrl+Shift+D to enable past dates.",
+                message: keyboard.pastDatesValidationMessage,
               });
             }
             return true;
           }),
         warehouseId: Yup.string().required("Warehouse is required"),
-        paidAmount: Yup.number()
-          .transform((_v, orig) =>
-            orig === "" || orig == null ? 0 : Number(orig)
-          )
-          .min(0, "Cannot be negative"),
+        cashDiscountAmt: Yup.number().min(0),
         items: Yup.array()
           .of(
             Yup.object({
@@ -844,7 +177,7 @@ export default function PurchaseInvoiceForm({
           )
           .min(1, "Add at least one item"),
       }),
-    [allowPastDates, today]
+    [allowPastDates, today, keyboard.pastDatesValidationMessage]
   );
 
   const formik = useFormik({
@@ -854,62 +187,22 @@ export default function PurchaseInvoiceForm({
       purchaseDate: today,
       warehouseId: "",
       notes: "",
-      paidAmount: "",
-      paymentMethod: DEFAULT_INVOICE_PAYMENT_MODE,
-      paymentBankAccountId: "",
+      cashDiscountAmt: "0",
       items: [emptyRow()], // ← items inside formik
     },
 
     validationSchema,
 
     onSubmit: (values) => {
-      const invoiceGrandTotal = Math.round(
-        values.items.reduce((s, r) => s + r.taxableValue, 0) +
-          values.items.reduce((s, r) => s + r.sgst, 0) +
-          values.items.reduce((s, r) => s + r.cgst, 0)
-      );
-      const paidAmount = resolveReceivedPaidAmount(
-        invoiceGrandTotal,
-        values.paidAmount,
-        "credit"
-      );
-      const splitTotal = sumInvoicePayments(payments);
-      const paymentLines = resolvePaymentsForSubmit(
-        payments,
-        paidAmount,
-        values.paymentMethod,
-        values.paymentBankAccountId
-      );
-
-      if (paidAmount > invoiceGrandTotal + 0.009) {
-        toast.error("Paid amount cannot exceed invoice total");
-        return;
-      }
-      if (splitTotal > paidAmount + 0.009) {
-        toast.error("Payment split cannot exceed paid amount");
-        return;
-      }
-      if (splitTotal > 0 && splitTotal < paidAmount - 0.009) {
-        toast.error("Payment split must equal paid amount");
-        return;
-      }
-
-      for (const line of paymentLines) {
-        if (needsBankAccount(line.paymentMode) && !line.bankAccountId) {
-          toast.error("Select a bank account for bank/UPI payments");
-          return;
-        }
-      }
-
       const payload = {
         vendorId: values.vendorId,
         vendorInvoiceNo: values.vendorInvoiceNo,
         purchaseDate: values.purchaseDate,
         warehouseId: values.warehouseId,
         notes: values.notes,
+        cashDiscountPercent: 0,
+        cashDiscountAmt: Number(values.cashDiscountAmt) || 0,
         attachments,
-        paidAmount,
-        ...(paidAmount > 0 && paymentLines.length ? { payments: paymentLines } : {}),
         items: values.items.map((r, i) => ({
           slNo: i + 1,
           itemId: r.itemId,
@@ -982,15 +275,28 @@ export default function PurchaseInvoiceForm({
   };
 
   // ── Item select handler ───────────────────────────────────
-  const handleItemSelect = (
+  const handleItemSelect = async (
     index: number,
     itemId: string,
     itemData?: any
   ) => {
-    const item = itemData;
-    if (!item) return;
-    const updated = {
-      ...values.items[index],
+    if (!itemId) {
+      setFieldValue(`items[${index}]`, emptyRow());
+      return;
+    }
+
+    let item = itemData;
+    if (!item) {
+      try {
+        item = await itemService.getOne(itemId);
+      } catch {
+        toast.error("Failed to load product details");
+        return;
+      }
+    }
+
+    const updated = clearPurchaseRowQtyDependents({
+      ...emptyRow(),
       itemId,
       itemName: item?.name || "",
       hsn: item?.hsnCode || item?.hsn || "",
@@ -1002,7 +308,7 @@ export default function PurchaseInvoiceForm({
           : "",
       taxPercent: Number(item?.taxPercent) || 18,
       rate: String(itemPurchaseRate(item) || ""),
-    };
+    });
     setFieldValue(`items[${index}]`, calcRow(updated));
   };
 
@@ -1012,24 +318,25 @@ export default function PurchaseInvoiceForm({
     field: "qty" | "discount",
     value: string
   ) => {
-    const updated = { ...values.items[index], [field]: value };
+    const updated = clearPurchaseRowCalculated({
+      ...values.items[index],
+      [field]: value,
+    });
     setFieldValue(`items[${index}]`, calcRow(updated));
   };
 
   // ── Totals ────────────────────────────────────────────────
-  const netAmount = values.items.reduce((s, r) => s + r.taxableValue, 0);
-  const totalSGST = values.items.reduce((s, r) => s + r.sgst, 0);
-  const totalCGST = values.items.reduce((s, r) => s + r.cgst, 0);
-  const totalTax = totalSGST + totalCGST;
-  const total = netAmount + totalTax;
-  const grandTotal = Math.round(total);
-  const roundOff = Number((grandTotal - total).toFixed(2));
-  const paidAmount = resolveReceivedPaidAmount(
+  const {
+    netAmount,
+    totalSGST,
+    totalCGST,
+    totalTax,
+    total,
+    billTotal,
+    roundOff,
+    cashDiscountAmt,
     grandTotal,
-    values.paidAmount,
-    "credit"
-  );
-  const balanceDue = Number((grandTotal - paidAmount).toFixed(2));
+  } = computeInvoiceTotalsFromItems(values.items, values.cashDiscountAmt);
 
   return (
     <FormikProvider value={formik}>
@@ -1039,7 +346,7 @@ export default function PurchaseInvoiceForm({
           description="Record a new purchase"
         />
 
-        <InvoiceFormKeyboardHints allowPastDates={allowPastDates} />
+        <InvoiceFormKeyboardHints allowPastDates={allowPastDates} keyboard={keyboard} />
 
         <form
           ref={formRef}
@@ -1101,28 +408,6 @@ export default function PurchaseInvoiceForm({
                 addLabel="Add Warehouse"
                 onAddClick={() => setQuickAdd("warehouse")}
               />
-
-              <InvoicePaymentMethodSelect
-                name="paymentMethod"
-                value={values.paymentMethod}
-                onChange={(e) => {
-                  handleChange(e);
-                  if (!needsBankAccount(e.target.value)) {
-                    setFieldValue("paymentBankAccountId", "");
-                  }
-                }}
-                onBlur={handleBlur}
-              />
-
-              {needsBankAccount(values.paymentMethod) && (
-                <InvoicePaymentAccountSelect
-                  paymentMode={values.paymentMethod}
-                  name="paymentBankAccountId"
-                  value={values.paymentBankAccountId}
-                  onChange={handleChange}
-                  onBlur={handleBlur}
-                />
-              )}
             </div>
           </div>
 
@@ -1143,7 +428,7 @@ export default function PurchaseInvoiceForm({
                 loadOptions={loadVendors}
                 onValueChange={(id, opt) => {
                   setFieldValue("vendorId", id);
-                  setVendorOption(opt);
+                  setVendorOption(id ? opt : null);
                   fillVendorDetails(id, opt?.data);
                 }}
                 onBlur={() => setFieldTouched("vendorId", true)}
@@ -1214,16 +499,18 @@ export default function PurchaseInvoiceForm({
             </div>
 
             <FieldArray name="items">
-              {({ push, remove }) => {
+              {({ remove }) => {
                 pushRowRef.current = () => {
-                  push(emptyRow());
-                  setTimeout(() => {
-                    const form = formRef.current;
-                    if (!form) return;
-                    const selects = form.querySelectorAll('[data-enter-nav="item-select"]');
-                    const last = selects[selects.length - 1] as HTMLElement | undefined;
-                    if (last) focusEnterNavField(last);
-                  }, 60);
+                  const { nextItems, merged } = appendMergedInvoiceRow(
+                    values.items,
+                    emptyRow,
+                    calcRow
+                  );
+                  setFieldValue("items", nextItems);
+                  if (merged) {
+                    toast.success("Duplicate products merged");
+                  }
+                  setTimeout(() => focusLastItemRow(formRef.current), 60);
                 };
 
                 return (
@@ -1447,7 +734,7 @@ export default function PurchaseInvoiceForm({
                   <div className="px-4 py-3 border-t">
                     <button
                       type="button"
-                      onClick={() => push(emptyRow())}
+                      onClick={() => pushRowRef.current?.()}
                       className="flex items-center gap-1 text-xs text-blue-600 hover:text-blue-800 font-medium"
                     >
                       <Plus size={13} /> Add Row
@@ -1459,14 +746,7 @@ export default function PurchaseInvoiceForm({
             </FieldArray>
 
             {/* ── Summary ───────────────────────────────────── */}
-            <div className="flex flex-col gap-6 border-t bg-gray-50 p-6 lg:flex-row lg:items-start lg:justify-between">
-              <InvoicePaymentDetailsForm
-                grandTotal={grandTotal}
-                receivedAmount={paidAmount}
-                payments={payments}
-                onPaymentsChange={setPayments}
-                receivedLabel="Paid"
-              />
+            <div className="flex justify-end border-t bg-gray-50 p-6">
               <div className={invoiceSummaryPanelClass}>
                 <div className="flex justify-between text-gray-600">
                   <span>Net Amount</span>
@@ -1501,40 +781,37 @@ export default function PurchaseInvoiceForm({
                   </span>
                 </div>
 
+                <div className="flex justify-between font-semibold text-gray-800">
+                  <span>Bill Total</span>
+                  <span>₹ {billTotal.toFixed(2)}</span>
+                </div>
+
+                <div className="flex justify-between items-center gap-3 text-gray-600">
+                  <span>Discount ₹</span>
+                  <input
+                    type="number"
+                    name="cashDiscountAmt"
+                    value={values.cashDiscountAmt}
+                    onChange={handleChange}
+                    onBlur={handleBlur}
+                    onKeyDown={blockNeg}
+                    min="0"
+                    step="0.01"
+                    className="w-24 border-b border-gray-300 bg-transparent py-0.5 text-sm text-right outline-none focus:border-blue-600"
+                  />
+                </div>
+
+                {cashDiscountAmt > 0 && (
+                  <div className="flex justify-between text-red-600">
+                    <span>Discount Applied</span>
+                    <span>- ₹ {cashDiscountAmt.toFixed(2)}</span>
+                  </div>
+                )}
+
                 <div className={invoiceSummaryGrandTotalClass}>
                   <span>Grand Total</span>
                   <span>₹ {grandTotal.toFixed(2)}</span>
                 </div>
-
-                <div className="rounded-lg border border-emerald-200 bg-emerald-50/80 px-3 py-2.5">
-                  <div className="flex justify-between items-center gap-3">
-                    <span className="text-sm font-semibold text-emerald-900">
-                      Paid Amount
-                    </span>
-                    <input
-                      type="number"
-                      name="paidAmount"
-                      value={values.paidAmount}
-                      onChange={handleChange}
-                      onBlur={handleBlur}
-                      onKeyDown={blockNeg}
-                      min="0"
-                      step="0.01"
-                      placeholder="0"
-                      className="w-32 rounded-md border border-emerald-300 bg-white px-2 py-1.5 text-sm font-semibold text-right text-emerald-900 outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-200"
-                    />
-                  </div>
-                  <p className="mt-1 text-xs text-emerald-800">
-                    Leave empty for full amount on credit (payable).
-                  </p>
-                </div>
-
-                {balanceDue > 0 && (
-                  <div className="flex justify-between text-orange-600 font-medium">
-                    <span>Balance Payable</span>
-                    <span>₹ {balanceDue.toFixed(2)}</span>
-                  </div>
-                )}
 
                 <p className="text-gray-400 text-xs italic pt-1">
                   {amountInWords(grandTotal)}

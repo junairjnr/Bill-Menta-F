@@ -76,6 +76,7 @@ export default function ShopReportPage() {
   const router = useRouter();
   const [partyType, setPartyType] = useState("");
   const [partyId, setPartyId] = useState("");
+  const [customerType, setCustomerType] = useState("");
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
   const [page, setPage] = useState(1);
@@ -91,6 +92,10 @@ export default function ShopReportPage() {
   const { data, isLoading, isFetching } = useShopReport({
     partyType: partyType === "customer" || partyType === "vendor" ? partyType : undefined,
     partyId: partyId || undefined,
+    salesType:
+      partyType === "customer" && (customerType === "retail" || customerType === "wholesale")
+        ? customerType
+        : undefined,
     dateFrom: dateFrom || undefined,
     dateTo: dateTo || undefined,
     page,
@@ -103,6 +108,7 @@ export default function ShopReportPage() {
   const activeFilterCount = countActiveFilters({
     partyType,
     partyId,
+    customerType,
     dateFrom,
     dateTo,
   });
@@ -111,16 +117,27 @@ export default function ShopReportPage() {
   const clear = () => {
     setPartyType("");
     setPartyId("");
+    setCustomerType("");
     setDateFrom("");
     setDateTo("");
     setPage(1);
   };
 
+  const filteredCustomers =
+    partyType === "customer" && (customerType === "retail" || customerType === "wholesale")
+      ? customers.filter(
+          (c: { customerType?: string }) => c.customerType === customerType
+        )
+      : customers;
+
   const partyOptions =
     partyType === "vendor"
       ? vendors.map((v: { _id: string; name: string }) => ({ value: v._id, label: v.name }))
       : partyType === "customer"
-        ? customers.map((c: { _id: string; name: string }) => ({ value: c._id, label: c.name }))
+        ? filteredCustomers.map((c: { _id: string; name: string; customerType?: string }) => ({
+            value: c._id,
+            label: `${c.name}${c.customerType ? ` (${c.customerType})` : ""}`,
+          }))
         : [];
 
   return (
@@ -130,7 +147,7 @@ export default function ShopReportPage() {
       onClear={clear}
       activeFilterCount={activeFilterCount}
       exportType="shop-report"
-      exportParams={{ partyType, partyId, dateFrom, dateTo }}
+      exportParams={{ partyType, partyId, salesType: customerType, dateFrom, dateTo }}
       summaryLoading={isFetching && !isLoading}
       summary={
         summary
@@ -158,10 +175,28 @@ export default function ShopReportPage() {
               onChange={(v) => {
                 setPartyType(v);
                 setPartyId("");
+                setCustomerType("");
                 resetPage();
               }}
             />
           </FilterField>
+          {partyType === "customer" && (
+            <FilterField label="Customer Type">
+              <FilterSelect
+                value={customerType}
+                placeholder="All types"
+                options={[
+                  { value: "retail", label: "Retail" },
+                  { value: "wholesale", label: "Wholesale" },
+                ]}
+                onChange={(v) => {
+                  setCustomerType(v);
+                  setPartyId("");
+                  resetPage();
+                }}
+              />
+            </FilterField>
+          )}
           {partyType && (
             <FilterField label={partyType === "vendor" ? "Vendor" : "Customer"} wide>
               <FilterSelect

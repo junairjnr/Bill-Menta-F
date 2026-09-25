@@ -92,7 +92,13 @@ export default function ManualJournalPage() {
                     <select
                       required
                       value={line.accountCode}
-                      onChange={(e) => updateLine(line.key, { accountCode: e.target.value })}
+                      onChange={(e) =>
+                        updateLine(line.key, {
+                          accountCode: e.target.value,
+                          debit: 0,
+                          credit: 0,
+                        })
+                      }
                       className={inputClass}
                     >
                       <option value="">Select account</option>

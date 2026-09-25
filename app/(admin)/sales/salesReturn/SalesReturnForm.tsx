@@ -28,6 +28,7 @@ import {
 import { useInvoiceFormShortcuts } from "@/app/hooks/useInvoiceFormShortcuts";
 import InvoiceFormKeyboardHints from "@/app/utilsComponents/InvoiceFormKeyboardHints";
 import { invoiceItemsTableClass, invoiceSummaryPanelClass, invoiceSummaryGrandTotalClass } from "@/app/utilsComponents/report-ui";
+import { resetManualLineKeepingKey } from "@/app/utilsComponents/invoiceFormUtils";
 import InvoiceQuickAddModals, {
   getEntityId,
   type QuickAddModal,
@@ -121,7 +122,7 @@ export default function SalesReturnForm({ onPendingChange }: SalesReturnFormProp
   const [quickAdd, setQuickAdd] = useState<QuickAddModal>(null);
   const [productRowKey, setProductRowKey] = useState<string | null>(null);
 
-  const { formRef, allowPastDates, today, minDate, maxDate, handleFormKeyDown, dateHint } =
+  const { formRef, allowPastDates, today, minDate, maxDate, handleFormKeyDown, dateHint, keyboard } =
     useInvoiceFormShortcuts();
 
   const { data: invoiceList } = useSalesInvoices({ limit: LOOKUP_LIMIT });
@@ -250,8 +251,39 @@ export default function SalesReturnForm({ onPendingChange }: SalesReturnFormProp
 
   const handleManualItemChange = (key: string, field: keyof ManualLine, value: string) => {
     setManualLines((prev) =>
-      prev.map((line) => (line.key === key ? { ...line, [field]: value } : line))
+      prev.map((line) => {
+        if (line.key !== key) return line;
+        if (field === "qty" || field === "discount" || field === "rate") {
+          return { ...line, [field]: value };
+        }
+        return { ...line, [field]: value };
+      })
     );
+  };
+
+  const resetManualReturnFields = () => {
+    setCustomerId("");
+    setCustomerOption(null);
+    setWarehouseId("");
+    setPriceLevelId("");
+    setActivePriceLevelPct(0);
+    setReferenceInvoiceNo("");
+    setManualLines([newManualLine()]);
+  };
+
+  const resetInvoiceReturnFields = () => {
+    setInvoiceId(presetInvoiceId || "");
+    setReturnQtys({});
+  };
+
+  const handleReturnModeChange = (mode: ReturnMode) => {
+    if (mode === returnMode) return;
+    setReturnMode(mode);
+    if (mode === "invoice") {
+      resetManualReturnFields();
+    } else {
+      resetInvoiceReturnFields();
+    }
   };
 
   const handlePriceLevelChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
@@ -262,9 +294,15 @@ export default function SalesReturnForm({ onPendingChange }: SalesReturnFormProp
     setActivePriceLevelPct(pct);
     setManualLines((prev) =>
       prev.map((line) => {
-        if (!line.baseRate) return line;
-        const rate = applyPriceLevelRate(line.baseRate, pct);
-        return { ...line, rate: String(rate) };
+        if (!line.itemId) return line;
+        const rate = line.baseRate ? applyPriceLevelRate(line.baseRate, pct) : 0;
+        return resetManualLineKeepingKey(newManualLine, line.key, {
+          itemId: line.itemId,
+          itemName: line.itemName,
+          baseRate: line.baseRate,
+          taxPercent: line.taxPercent,
+          rate: String(rate || ""),
+        });
       })
     );
   };
@@ -275,7 +313,6 @@ export default function SalesReturnForm({ onPendingChange }: SalesReturnFormProp
     if (returnMode === "manual") {
       if (!customerId) return toast.error("Select a customer");
       if (!warehouseId) return toast.error("Select a warehouse");
-      if (!priceLevelId) return toast.error("Select a price level");
 
       const items = manualLines
         .map((line) => ({
@@ -302,7 +339,7 @@ export default function SalesReturnForm({ onPendingChange }: SalesReturnFormProp
           customerId,
           warehouseId,
           salesType,
-          priceLevelId,
+          ...(priceLevelId ? { priceLevelId } : {}),
           referenceInvoiceNo: referenceInvoiceNo.trim() || undefined,
           items,
           notes: notes.trim() || undefined,
@@ -365,7 +402,7 @@ export default function SalesReturnForm({ onPendingChange }: SalesReturnFormProp
         description="Return against an invoice or record a manual return when invoice data is missing"
       />
 
-      <InvoiceFormKeyboardHints allowPastDates={allowPastDates} />
+      <InvoiceFormKeyboardHints allowPastDates={allowPastDates} keyboard={keyboard} />
 
       <form
         ref={formRef}
@@ -386,7 +423,7 @@ export default function SalesReturnForm({ onPendingChange }: SalesReturnFormProp
                 key={mode}
                 type="button"
                 disabled={!!presetInvoiceId && mode === "manual"}
-                onClick={() => setReturnMode(mode)}
+                onClick={() => handleReturnModeChange(mode)}
                 className={`rounded-md border px-4 py-2 text-sm font-medium transition ${
                   returnMode === mode
                     ? "border-black bg-black text-white"
@@ -410,7 +447,10 @@ export default function SalesReturnForm({ onPendingChange }: SalesReturnFormProp
                   disabled={!!presetInvoiceId}
                   options={invoiceOptions}
                   placeholder="Select invoice..."
-                  onChange={(e) => setInvoiceId(e.target.value)}
+                  onChange={(e) => {
+                    setInvoiceId(e.target.value);
+                    setReturnQtys({});
+                  }}
                   onBlur={() => {}}
                 />
               </div>
@@ -551,10 +591,9 @@ export default function SalesReturnForm({ onPendingChange }: SalesReturnFormProp
                 label="Price Level"
                 name="priceLevelId"
                 value={priceLevelId}
-                required
                 enterNav
                 options={priceLevelOptions}
-                placeholder="Select price level..."
+                placeholder="Select price level (optional)"
                 onChange={handlePriceLevelChange}
                 onBlur={() => {}}
               />
@@ -669,6 +708,14 @@ export default function SalesReturnForm({ onPendingChange }: SalesReturnFormProp
                         }
                         loadOptions={loadItems}
                         onChange={(itemId, opt) => {
+                          if (!itemId) {
+                            setManualLines((prev) =>
+                              prev.map((l) =>
+                                l.key === line.key ? { ...newManualLine(), key: l.key } : l
+                              )
+                            );
+                            return;
+                          }
                           const itemData = opt?.data as {
                             price?: number;
                             salesRate?: number;
@@ -681,7 +728,8 @@ export default function SalesReturnForm({ onPendingChange }: SalesReturnFormProp
                             prev.map((l) =>
                               l.key === line.key
                                 ? {
-                                    ...l,
+                                    ...newManualLine(),
+                                    key: l.key,
                                     itemId,
                                     itemName: opt?.label ?? "",
                                     baseRate,
@@ -835,12 +883,15 @@ export default function SalesReturnForm({ onPendingChange }: SalesReturnFormProp
           setManualLines((prev) =>
             prev.map((l) =>
               l.key === productRowKey
-                ? {
-                    ...l,
+                ? resetManualLineKeepingKey(newManualLine, l.key, {
                     itemId: id,
                     itemName: item.name ?? "",
-                    rate: String(itemSalesRate(item) || l.rate),
-                  }
+                    baseRate: itemSalesRate(item),
+                    taxPercent: Number((item as { taxPercent?: number }).taxPercent) || 0,
+                    rate: String(
+                      applyPriceLevelRate(itemSalesRate(item), activePriceLevelPct) || ""
+                    ),
+                  })
                 : l
             )
           );

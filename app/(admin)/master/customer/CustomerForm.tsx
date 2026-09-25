@@ -559,6 +559,15 @@ export default function CustomerForm({
     setFieldValue,
   } = formik;
 
+  const handlePartyTypeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const nextType = e.target.value;
+    setFieldValue("type", nextType);
+    if (nextType === "purchase") {
+      setFieldValue("customerType", "retail");
+      setFieldValue("creditLimit", 0);
+    }
+  };
+
   // ── Auto fill state code when state selected ──────────────
   const handleStateChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const selected = INDIAN_STATES.find((s) => s.name === e.target.value);
@@ -911,7 +920,7 @@ export default function CustomerForm({
             label="Party Type"
             name="type"
             value={values.type}
-            onChange={handleChange}
+            onChange={handlePartyTypeChange}
             options={[
               {
                 value: "sales",

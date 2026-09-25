@@ -231,7 +231,11 @@ export default function SalesInvoiceViewPage() {
             />
             <ViewField
               label="Price Level"
-              value={`${invoice.priceLevelSnapshot?.name} (${invoice.priceLevelSnapshot?.taxPercent}%)`}
+              value={
+                invoice.priceLevelSnapshot?.name
+                  ? `${invoice.priceLevelSnapshot.name} (${invoice.priceLevelSnapshot.taxPercent}%)`
+                  : "—"
+              }
             />
             <ViewField
               label="Warehouse"
@@ -362,6 +366,17 @@ export default function SalesInvoiceViewPage() {
         <ViewSection id="summary" title="Summary">
           <div className="flex justify-end">
             <div className={invoiceViewSummaryPanelClass}>
+              {cashDiscountAmt > 0 ? (
+                <div className="flex justify-between border-b py-1.5 text-red-600">
+                  <span>Discount Applied</span>
+                  <span>- ₹ {cashDiscountAmt.toFixed(2)}</span>
+                </div>
+              ) : (
+                <div className="flex justify-between border-b py-1.5 text-gray-600">
+                  <span>Discount Amount</span>
+                  <span>- ₹ 0.00</span>
+                </div>
+              )}
               <div className="flex justify-between border-b py-1.5 text-gray-600">
                 <span>Subtotal (Taxable Value)</span>
                 <span className="font-medium">₹ {lineNetAmount.toFixed(2)}</span>
@@ -406,12 +421,6 @@ export default function SalesInvoiceViewPage() {
                 <span>Bill Total</span>
                 <span>₹ {billTotal.toFixed(2)}</span>
               </div>
-              {cashDiscountAmt > 0 && (
-                <div className="flex justify-between border-b py-1.5 text-red-600">
-                  <span>Cash Discount</span>
-                  <span>- ₹ {cashDiscountAmt.toFixed(2)}</span>
-                </div>
-              )}
               <div className={invoiceSummaryGrandTotalClass}>
                 <span>Amount to Collect</span>
                 <span>₹ {invoice.grandTotal.toFixed(2)}</span>
@@ -435,6 +444,7 @@ export default function SalesInvoiceViewPage() {
           <InvoicePaymentSection
             invoice={invoice}
             payments={invoicePayments}
+            initialPayments={invoice.payments}
             isLoadingPayments={paymentsLoading}
           />
         </ViewSection>

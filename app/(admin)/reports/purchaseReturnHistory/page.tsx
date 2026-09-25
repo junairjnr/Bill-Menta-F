@@ -26,10 +26,11 @@ const COLS = [
   "Date",
   "Original Invoice",
   "Item",
+  "HSN",
   "Vendor",
   "Qty",
   "Rate",
-  "Taxable",
+  "Taxable Value",
   "SGST",
   "CGST",
   "Total",
@@ -163,6 +164,7 @@ export default function PurchaseReturnHistoryPage() {
               <td className="px-4 py-3 text-gray-600">{fmtDate(row.returnDate)}</td>
               <td className="px-4 py-3 text-gray-500">{row.originalInvoiceNo}</td>
               <td className="px-4 py-3">{row.itemName || "—"}</td>
+              <td className="px-4 py-3 text-gray-500">{row.hsn || "—"}</td>
               <td className="px-4 py-3">{row.vendor?.name || "—"}</td>
               <td className="px-4 py-3 text-right font-medium">{row.qty}</td>
               <td className="px-4 py-3 text-right">{fmtMoney(row.rate)}</td>

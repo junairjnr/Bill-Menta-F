@@ -15,6 +15,7 @@ export const PURCHASE_INVOICE_FORM_ID = "purchase-invoice-form";
 export const SALES_INVOICE_FORM_ID = "sales-invoice-form";
 export const PURCHASE_RETURN_FORM_ID = "purchase-return-form";
 export const SALES_RETURN_FORM_ID = "sales-return-form";
+export const QUOTATION_FORM_ID = "quotation-form";
 export const VOUCHER_FORM_ID = "voucher-form";
 export const EXPENSE_FORM_ID = "expense-form";
 export const USER_FORM_ID = "user-form";
@@ -348,6 +349,28 @@ export function purchaseReturnFormFooterButtons({
       label: isPending ? "Saving..." : "Save Return",
       type: "submit",
       form: PURCHASE_RETURN_FORM_ID,
+      disabled: isPending,
+      className: primaryBtn,
+    },
+  ];
+}
+
+export function quotationFormFooterButtons({
+  isPending = false,
+  onCancel,
+}: Omit<FormFooterOptions, "isEdit">): FooterButton[] {
+  return [
+    {
+      label: "Cancel",
+      variant: "outline",
+      disabled: isPending,
+      onClick: onCancel,
+      className: cancelBtn,
+    },
+    {
+      label: isPending ? "Saving..." : "Save Quotation",
+      type: "submit",
+      form: QUOTATION_FORM_ID,
       disabled: isPending,
       className: primaryBtn,
     },

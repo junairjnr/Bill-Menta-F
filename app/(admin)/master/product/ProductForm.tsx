@@ -653,8 +653,8 @@ import {
 import { loadCategories, loadTaxMasters, loadUoms } from "@/app/formComponents/masterLoadOptions";
 import { toOption, type SelectOption } from "@/app/formComponents/selectTypes";
 import {
-  percentageField,
   positiveNumber,
+  positiveNumberOptional,
 } from "../../../utilsComponents/Validations";
 import FormSelectWithAdd from "@/app/formComponents/FormSelectWithAdd";
 import FormNumberInput from "@/app/formComponents/FormNumber";
@@ -670,6 +670,10 @@ import {
   uomFormFooterButtons,
 } from "@/app/utilsComponents/form-footer";
 import { getEntityId } from "@/app/utilsComponents/InvoiceQuickAddModals";
+import {
+  profitPercentFromRates,
+  salesRateFromProfit,
+} from "@/app/utils/itemRates";
 import React from "react";
 
 interface ProductFormProps {
@@ -680,6 +684,7 @@ interface ProductFormProps {
     uomId: string;
     salesRate: number | string;
     purchaseRate: number | string;
+    profitPercent?: number | string;
     price: number | string;
     taxPercent: number | string;
     taxMasterId?: string;
@@ -735,6 +740,13 @@ const ProductForm = ({
     initialValues: initialValues
       ? {
           ...initialValues,
+          profitPercent:
+            initialValues.profitPercent ??
+            profitPercentFromRates(
+              Number(initialValues.purchaseRate),
+              Number(initialValues.salesRate)
+            ) ??
+            "",
           hasGst: Number(initialValues.taxPercent) > 0 ? "yes" : "no",
           taxMasterId: initialValues.taxMasterId ?? "",
         }
@@ -745,6 +757,7 @@ const ProductForm = ({
       uomId: "",
       salesRate: "",
       purchaseRate: "",
+      profitPercent: "",
       price: "",
       taxPercent: 0,
       taxMasterId: "",
@@ -761,6 +774,7 @@ const ProductForm = ({
       hsnCode: Yup.string().required("HSN Code is required"),
       salesRate: positiveNumber,
       purchaseRate: positiveNumber,
+      profitPercent: positiveNumberOptional,
       hasGst: Yup.string().oneOf(["yes", "no"]),
       taxMasterId: Yup.string().when("hasGst", {
         is: "yes",
@@ -818,6 +832,42 @@ const ProductForm = ({
     setFieldTouched,
   } = formik;
 
+  const handlePurchaseRateChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    handleChange(e);
+    const purchase = Number(e.target.value);
+    const profit = Number(values.profitPercent);
+    if (purchase > 0 && values.profitPercent !== "" && !Number.isNaN(profit)) {
+      const sales = salesRateFromProfit(purchase, profit);
+      if (sales !== "") {
+        setFieldValue("salesRate", sales);
+      }
+    }
+  };
+
+  const handleProfitPercentChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    handleChange(e);
+    const profit = Number(e.target.value);
+    const purchase = Number(values.purchaseRate);
+    if (purchase > 0 && e.target.value !== "" && !Number.isNaN(profit)) {
+      const sales = salesRateFromProfit(purchase, profit);
+      if (sales !== "") {
+        setFieldValue("salesRate", sales);
+      }
+    }
+  };
+
+  const handleSalesRateChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    handleChange(e);
+    const sales = Number(e.target.value);
+    const purchase = Number(values.purchaseRate);
+    if (purchase > 0 && e.target.value !== "" && !Number.isNaN(sales)) {
+      const profit = profitPercentFromRates(purchase, sales);
+      if (profit !== "") {
+        setFieldValue("profitPercent", profit);
+      }
+    }
+  };
+
   return (
     <div className={`w-full mx-auto ${modalMode ? "p-2" : "p-5"}`}>
       {!modalMode && (
@@ -868,7 +918,7 @@ const ProductForm = ({
             onAddClick={() => setCategoryModal(true)}
             onValueChange={(id, opt) => {
               setFieldValue("categoryId", id);
-              setCategoryOption(opt);
+              setCategoryOption(id ? opt : null);
             }}
             onBlur={() => setFieldTouched("categoryId", true)}
           />
@@ -881,11 +931,22 @@ const ProductForm = ({
             required
             error={errors.purchaseRate}
             touched={touched.purchaseRate}
-            onChange={handleChange}
+            onChange={handlePurchaseRateChange}
             onBlur={handleBlur}
             onKeyDown={blockNegative}
           />
 
+          <FormNumberInput
+            label="Profit Percentage"
+            name="profitPercent"
+            value={values.profitPercent}
+            placeholder="Enter profit %"
+            error={errors.profitPercent}
+            touched={touched.profitPercent}
+            onChange={handleProfitPercentChange}
+            onBlur={handleBlur}
+            onKeyDown={blockNegative}
+          />
 
           <FormNumberInput
             label="Sales Rate"
@@ -895,26 +956,10 @@ const ProductForm = ({
             required
             error={errors.salesRate}
             touched={touched.salesRate}
-            onChange={handleChange}
+            onChange={handleSalesRateChange}
             onBlur={handleBlur}
             onKeyDown={blockNegative}
           />
-
-          <FormNumberInput
-            label="Profit Percentage"
-            name="purchaseRate"
-            value={values.purchaseRate}
-            placeholder="Enter purchase rate"
-            required
-            error={errors.purchaseRate}
-            touched={touched.purchaseRate}
-            onChange={handleChange}
-            onBlur={handleBlur}
-            onKeyDown={blockNegative}
-          />
-
-
-          
           <FormSelectWithAdd
             label="Unit"
             value={values.uomId}
@@ -928,7 +973,7 @@ const ProductForm = ({
             onAddClick={() => setUomModal(true)}
             onValueChange={(id, opt) => {
               setFieldValue("uomId", id);
-              setUomOption(opt);
+              setUomOption(id ? opt : null);
             }}
             onBlur={() => setFieldTouched("uomId", true)}
           />
@@ -976,7 +1021,11 @@ const ProductForm = ({
               onAddClick={() => setTaxMasterModal(true)}
               onValueChange={(id, opt) => {
                 setFieldValue("taxMasterId", id);
-                setTaxMasterOption(opt);
+                setTaxMasterOption(id ? opt : null);
+                if (!id) {
+                  setFieldValue("taxPercent", 0);
+                  return;
+                }
                 const taxPercent = Number(
                   (opt?.data as { taxPercent?: number })?.taxPercent ?? 0
                 );

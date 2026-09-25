@@ -84,6 +84,7 @@ export default function InvoicePaymentDetailsForm({
   };
 
   const maxForRow = (index: number) => {
+    if (effectiveReceived <= 0) return 0;
     const otherTotal = payments.reduce(
       (sum, row, i) => (i === index ? sum : sum + (Number(row.amount) || 0)),
       0
@@ -91,22 +92,16 @@ export default function InvoicePaymentDetailsForm({
     return Math.max(0, Number((effectiveReceived - otherTotal).toFixed(2)));
   };
 
-  if (effectiveReceived <= 0) {
-    return (
-      <div className="w-full max-w-lg rounded-lg border border-dashed border-gray-200 bg-white p-4 text-sm text-gray-500">
-        Enter {receivedLabel.toLowerCase()} amount to optionally split by payment method.
-      </div>
-    );
-  }
-
   return (
-    <div className="w-full max-w-lg space-y-3 text-sm">
+    <div className="w-full max-w-[550px] space-y-3 text-sm">
       <div className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
         <div className="mb-3 flex items-center justify-between gap-2">
           <div>
             <h4 className="text-sm font-semibold text-gray-800">Part Payment Split</h4>
             <p className="text-xs text-gray-500">
-              Optional — split ₹ {effectiveReceived.toFixed(2)} across methods
+              {effectiveReceived > 0
+                ? `Optional — split ₹ ${effectiveReceived.toFixed(2)} across methods`
+                : `Enter ${receivedLabel.toLowerCase()} amount in summary to split by method`}
             </p>
           </div>
           <button
@@ -205,7 +200,7 @@ export default function InvoicePaymentDetailsForm({
           </table>
         </div>
 
-        {!hasSplitAmounts && (
+        {!hasSplitAmounts && effectiveReceived > 0 && (
           <p className="mt-2 text-xs text-gray-500">
             Leave amounts empty to use the payment method selected above.
           </p>
@@ -261,13 +256,21 @@ export default function InvoicePaymentDetailsForm({
   );
 }
 
-export function buildInvoicePaymentsPayload(rows: InvoicePaymentFormRow[]) {
+export function buildInvoicePaymentsPayload(
+  rows: InvoicePaymentFormRow[],
+  defaultBankAccountId = ""
+) {
+  const fallbackBankId =
+    defaultBankAccountId ||
+    rows.find((row) => row.bankAccountId)?.bankAccountId ||
+    "";
+
   return rows
     .filter((row) => Number(row.amount) > 0)
     .map((row) => ({
       paymentMode: row.paymentMode,
       bankAccountId: needsBankAccount(row.paymentMode)
-        ? row.bankAccountId || undefined
+        ? row.bankAccountId || fallbackBankId || undefined
         : undefined,
       amount: Number(row.amount),
       referenceNo: row.referenceNo?.trim() || undefined,
@@ -284,7 +287,7 @@ export function resolvePaymentsForSubmit(
   defaultPaymentMode: string,
   defaultBankAccountId = ""
 ) {
-  const splits = buildInvoicePaymentsPayload(rows);
+  const splits = buildInvoicePaymentsPayload(rows, defaultBankAccountId);
   if (splits.length > 0) return splits;
 
   if (receivedAmount <= 0) return [];

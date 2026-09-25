@@ -2,13 +2,11 @@
 
 import { useFormik, FieldArray, FormikProvider, getIn } from "formik";
 import * as Yup from "yup";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter } from "next/navigation";
 import { Trash2, Plus } from "lucide-react";
-import { Button } from "@/components/ui/button";
 import PageHeader from "@/app/utilsComponents/PageHeader";
-import { useCreateSalesInvoice } from "@/app/hooks/salesHooks/useSalesInvoice";
-import { useQuotation } from "@/app/hooks/salesHooks/useQuotation";
-import { useWarehouses, useWarehouseStock } from "@/app/hooks/warehouseHooks/useWarehouse";
+import { useCreateQuotation } from "@/app/hooks/salesHooks/useQuotation";
+import { useWarehouses } from "@/app/hooks/warehouseHooks/useWarehouse";
 import { usePriceLevels } from "@/app/hooks/masterHooks/priceLevelHook/usePriceLevel";
 import { useTaxMasters } from "@/app/hooks/masterHooks/taxMasterHook/useTaxMaster";
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
@@ -22,7 +20,7 @@ import { itemService } from "@/app/services/masterServices/item/item.service";
 import { toOption, type SelectOption } from "@/app/formComponents/selectTypes";
 import { SalesItemRow } from "@/app/types";
 import { useBranchStore } from "@/app/store/branch/branch.store";
-import { SALES_INVOICE_FORM_ID } from "@/app/utilsComponents/form-footer";
+import { QUOTATION_FORM_ID } from "@/app/utilsComponents/form-footer";
 import FormSelect from "@/app/formComponents/FormSelect";
 import FormSelectWithAdd from "@/app/formComponents/FormSelectWithAdd";
 import ItemSelectWithAdd from "@/app/formComponents/ItemSelectWithAdd";
@@ -59,28 +57,11 @@ import {
 import { itemSalesRate } from "@/app/utils/itemRates";
 import { useCompanySettings } from "@/app/hooks/settingsHook/useSettings";
 import toast from "react-hot-toast";
-import InvoicePaymentDetailsForm, {
-  emptyInvoicePaymentRow,
-  resolvePaymentsForSubmit,
-  resolveReceivedPaidAmount,
-  sumInvoicePayments,
-  type InvoicePaymentFormRow,
-} from "@/app/utilsComponents/InvoicePaymentDetailsForm";
-import {
-  InvoicePaymentAccountSelect,
-  InvoicePaymentMethodSelect,
-} from "@/app/utilsComponents/invoicePaymentFields";
-import {
-  DEFAULT_INVOICE_PAYMENT_MODE,
-  needsBankAccount,
-} from "@/app/utilsComponents/paymentConstants";
 
-// ── Block negative keys ───────────────────────────────────────
 const blockNeg = (e: React.KeyboardEvent<HTMLInputElement>) => {
   if (["-", "e", "E", "+"].includes(e.key)) e.preventDefault();
 };
 
-// ── Empty sales row ───────────────────────────────────────────
 const emptyRow = (): SalesItemRow => ({
   slNo: 0,
   itemId: "",
@@ -157,25 +138,19 @@ const calcRow = (
   };
 };
 
-export default function SalesInvoiceForm({
+export default function QuotationForm({
   onPendingChange,
 }: {
   onPendingChange?: (pending: boolean) => void;
 }) {
   const router = useRouter();
-  const searchParams = useSearchParams();
-  const quotationId = searchParams.get("quotationId") ?? "";
-  const { data: quotation } = useQuotation(quotationId);
-  const quotationPrefilledRef = useRef(false);
-  const prevSalesTypeRef = useRef<string | null>(null);
-  const { mutate: create, isPending } = useCreateSalesInvoice();
+  const { mutate: create, isPending } = useCreateQuotation();
 
   useEffect(() => {
     onPendingChange?.(isPending);
   }, [isPending, onPendingChange]);
   const activeBranch = useBranchStore((s) => s.activeBranch);
 
-  // ── API Data ──────────────────────────────────────────────
   const { data: priceLevelData } = usePriceLevels();
   const { data: taxMasterData } = useTaxMasters({
     isActive: true,
@@ -199,7 +174,6 @@ export default function SalesInvoiceForm({
     [warehouseData]
   );
 
-  // ── Customer auto-fill state ──────────────────────────────
   const [customerDetails, setCustomerDetails] = useState({
     gstin: "",
     place: "",
@@ -208,7 +182,6 @@ export default function SalesInvoiceForm({
     address: "",
   });
 
-  // ── Active price level ────────────────────────────────────
   const [activePriceLevelPct, setActivePriceLevelPct] = useState<number>(0);
   const [quickAdd, setQuickAdd] = useState<QuickAddModal>(null);
   const [productRowIndex, setProductRowIndex] = useState<number | null>(null);
@@ -219,13 +192,8 @@ export default function SalesInvoiceForm({
   const replaceRowRef = useRef<
     ((index: number, row: SalesItemRow) => void) | null
   >(null);
-  const valuesRef = useRef<{ items: SalesItemRow[]; warehouseId?: string }>({
-    items: [emptyRow()],
-  });
+  const valuesRef = useRef<{ items: SalesItemRow[] }>({ items: [emptyRow()] });
   const activePriceLevelPctRef = useRef(0);
-  const [payments, setPayments] = useState<InvoicePaymentFormRow[]>([
-    emptyInvoicePaymentRow(DEFAULT_INVOICE_PAYMENT_MODE),
-  ]);
 
   const {
     formRef,
@@ -240,16 +208,15 @@ export default function SalesInvoiceForm({
     onEnterAtLastField: () => pushRowRef.current?.(),
   });
 
-  const redirectToSalesList = () => {
-    router.push("/sales/salesInvoice");
+  const redirectToQuotationList = () => {
+    router.push("/sales/quotation");
   };
 
-  // ── Formik ────────────────────────────────────────────────
   const validationSchema = useMemo(
     () =>
       Yup.object({
-        invoiceDate: Yup.string()
-          .required("Invoice date is required")
+        quotationDate: Yup.string()
+          .required("Quotation date is required")
           .test("date-range", "Invalid date", function (value) {
             if (!value) return false;
             if (value > today) {
@@ -264,28 +231,10 @@ export default function SalesInvoiceForm({
             }
             return true;
           }),
+        validUntil: Yup.string().nullable(),
         salesType: Yup.string().required("Sales type is required"),
         customerId: Yup.string().required("Customer is required"),
-        warehouseId: Yup.string().required("Warehouse is required"),
         cashDiscountAmt: Yup.number().min(0),
-        receivedAmount: Yup.number()
-          .transform((_v, orig) =>
-            orig === "" || orig == null ? 0 : Number(orig)
-          )
-          .min(0, "Cannot be negative")
-          .test(
-            "max-collect",
-            "Cannot exceed amount to collect",
-            function (value) {
-              const items = this.parent?.items;
-              if (!Array.isArray(items)) return true;
-              const grand = computeInvoiceTotalsFromItems(
-                items,
-                this.parent?.cashDiscountAmt ?? 0
-              ).grandTotal;
-              return (Number(value) || 0) <= grand + 0.009;
-            }
-          ),
         items: Yup.array()
           .of(
             Yup.object({
@@ -311,17 +260,14 @@ export default function SalesInvoiceForm({
 
   const formik = useFormik({
     initialValues: {
-      invoiceDate: today,
+      quotationDate: today,
+      validUntil: "",
       salesType: "retail" as "retail" | "wholesale",
       priceLevelId: "",
       customerId: "",
       warehouseId: "",
       notes: "",
-      saleMode: "cash" as "credit" | "cash",
       cashDiscountAmt: "0",
-      receivedAmount: "",
-      paymentMethod: DEFAULT_INVOICE_PAYMENT_MODE,
-      paymentBankAccountId: "",
       items: [emptyRow()],
     },
 
@@ -329,57 +275,16 @@ export default function SalesInvoiceForm({
     enableReinitialize: false,
 
     onSubmit: (values) => {
-      const invoiceTotals = computeInvoiceTotalsFromItems(
-        values.items,
-        values.cashDiscountAmt
-      );
-      const paidAmount = resolveReceivedPaidAmount(
-        invoiceTotals.grandTotal,
-        values.receivedAmount,
-        values.saleMode
-      );
-      const splitTotal = sumInvoicePayments(payments);
-      const effectivePaidAmount =
-        splitTotal > 0
-          ? Math.min(splitTotal, invoiceTotals.grandTotal)
-          : paidAmount;
-      const paymentLines = resolvePaymentsForSubmit(
-        payments,
-        effectivePaidAmount,
-        values.paymentMethod,
-        values.paymentBankAccountId
-      );
-
-      if (splitTotal > effectivePaidAmount + 0.009) {
-        toast.error("Payment split cannot exceed received amount");
-        return;
-      }
-      if (splitTotal > 0 && splitTotal < effectivePaidAmount - 0.009) {
-        toast.error("Payment split must equal received amount");
-        return;
-      }
-
-      for (const line of paymentLines) {
-        if (needsBankAccount(line.paymentMode) && !line.bankAccountId) {
-          toast.error("Select a bank account for bank/UPI payments");
-          return;
-        }
-      }
-
       const payload = {
-        invoiceDate: values.invoiceDate,
+        quotationDate: values.quotationDate,
+        ...(values.validUntil ? { validUntil: values.validUntil } : {}),
         salesType: values.salesType,
         ...(values.priceLevelId ? { priceLevelId: values.priceLevelId } : {}),
         customerId: values.customerId,
-        warehouseId: values.warehouseId,
+        ...(values.warehouseId ? { warehouseId: values.warehouseId } : {}),
         notes: values.notes,
-        saleMode: values.saleMode,
         cashDiscountPercent: 0,
         cashDiscountAmt: Number(values.cashDiscountAmt) || 0,
-        paidAmount: effectivePaidAmount,
-        ...(effectivePaidAmount > 0 && paymentLines.length
-          ? { payments: paymentLines }
-          : {}),
         items: values.items.map((r, i) => ({
           slNo: i + 1,
           itemId: r.itemId,
@@ -398,9 +303,8 @@ export default function SalesInvoiceForm({
           igst: r.igst ?? 0,
           total: r.total,
         })),
-        ...(quotationId ? { quotationId } : {}),
       };
-      create(payload, { onSuccess: redirectToSalesList });
+      create(payload, { onSuccess: redirectToQuotationList });
     },
   });
 
@@ -415,30 +319,8 @@ export default function SalesInvoiceForm({
     setFieldTouched,
   } = formik;
 
-  const { data: warehouseStock } = useWarehouseStock(values.warehouseId);
-
   valuesRef.current = values;
   activePriceLevelPctRef.current = activePriceLevelPct;
-
-  const stockByItemId = useMemo(() => {
-    const map = new Map<string, number>();
-    for (const row of warehouseStock ?? []) {
-      const id =
-        typeof row.itemId === "object"
-          ? row.itemId._id
-          : String(row.itemId ?? "");
-      if (id) map.set(String(id), Number(row.qty) || 0);
-    }
-    return map;
-  }, [warehouseStock]);
-
-  const getAvailableQty = useCallback(
-    (itemId: string) => {
-      if (!values.warehouseId || !itemId) return null;
-      return stockByItemId.get(String(itemId)) ?? 0;
-    },
-    [stockByItemId, values.warehouseId]
-  );
 
   const supplierStateCode = useMemo(
     () =>
@@ -466,140 +348,25 @@ export default function SalesInvoiceForm({
     replaceRowRef.current?.(index, row);
   };
 
-  const resetPaymentInputs = () => {
-    setFieldValue("receivedAmount", "");
-    setFieldValue("paymentMethod", DEFAULT_INVOICE_PAYMENT_MODE);
-    setFieldValue("paymentBankAccountId", "");
-    setPayments([emptyInvoicePaymentRow(DEFAULT_INVOICE_PAYMENT_MODE)]);
-  };
-
   const loadCustomerOptions = useCallback(
     (search: string) => loadSalesCustomers(search, values.salesType),
     [values.salesType]
   );
 
   useEffect(() => {
-    if (!allowPastDates && values.invoiceDate !== today) {
-      setFieldValue("invoiceDate", today);
+    if (!allowPastDates && values.quotationDate !== today) {
+      setFieldValue("quotationDate", today);
     }
-  }, [allowPastDates, today, values.invoiceDate, setFieldValue]);
+  }, [allowPastDates, today, values.quotationDate, setFieldValue]);
 
   useEffect(() => {
-    if (quotationId) return;
     const defaultType = companySettings?.defaultSalesType;
     if (!defaultType) return;
     setFieldValue("salesType", defaultType);
-  }, [
-    quotationId,
-    companySettings?._id,
-    companySettings?.defaultSalesType,
-    setFieldValue,
-  ]);
+  }, [companySettings?._id, companySettings?.defaultSalesType, setFieldValue]);
 
-  useEffect(() => {
-    if (!quotation || quotationPrefilledRef.current) return;
-    quotationPrefilledRef.current = true;
+  const prevSalesTypeRef = useRef<string | null>(null);
 
-    setFieldValue("salesType", quotation.salesType);
-    prevSalesTypeRef.current = quotation.salesType;
-
-    const priceLevelId =
-      typeof quotation.priceLevelId === "object"
-        ? quotation.priceLevelId?._id
-        : quotation.priceLevelId ?? "";
-    if (priceLevelId) {
-      setFieldValue("priceLevelId", priceLevelId);
-      setActivePriceLevelPct(quotation.priceLevelSnapshot?.taxPercent ?? 0);
-    }
-
-    const customerId =
-      typeof quotation.customerId === "object"
-        ? quotation.customerId._id
-        : quotation.customerId;
-    if (customerId) {
-      setFieldValue("customerId", customerId);
-      const snap = quotation.customerSnapshot;
-      const custName =
-        snap?.name ||
-        (typeof quotation.customerId === "object"
-          ? quotation.customerId.name
-          : "");
-      setCustomerOption(toOption(customerId, custName, quotation.customerId));
-      setCustomerDetails({
-        gstin: snap?.gstin || "",
-        place: snap?.place || "",
-        state: snap?.state || "",
-        stateCode: snap?.stateCode || "",
-        address: snap?.address || "",
-      });
-    }
-
-    const warehouseId =
-      typeof quotation.warehouseId === "object"
-        ? quotation.warehouseId?._id
-        : quotation.warehouseId ?? "";
-    if (warehouseId) {
-      setFieldValue("warehouseId", warehouseId);
-    }
-
-    if (quotation.notes) {
-      setFieldValue("notes", quotation.notes);
-    }
-
-    setFieldValue(
-      "cashDiscountAmt",
-      String(quotation.cashDiscountAmt ?? 0)
-    );
-
-    const mappedItems = quotation.items.map((item: any, index: number) => {
-      const row: SalesItemRow = {
-        slNo: item.slNo ?? index + 1,
-        itemId:
-          typeof item.itemId === "object" ? item.itemId._id : item.itemId,
-        itemName:
-          typeof item.itemId === "object" ? item.itemId.name : "",
-        hsn: item.hsn || "",
-        uomId: typeof item.uomId === "object" ? item.uomId._id : item.uomId,
-        uomName:
-          typeof item.uomId === "object"
-            ? `${item.uomId.name} (${item.uomId.shortCode})`
-            : "",
-        baseRate: item.baseRate,
-        priceLevelPct: item.priceLevelPct ?? 0,
-        rate: item.rate,
-        qty: String(item.qty),
-        discount: String(item.discount ?? 0),
-        discountAmt: item.discountAmt ?? 0,
-        taxableValue: item.taxableValue,
-        taxPercent: item.taxPercent,
-        sgst: item.sgst,
-        cgst: item.cgst,
-        igst: item.igst ?? 0,
-        total: item.total,
-        rateManual: false,
-        taxManual: false,
-        taxMasterId: "",
-        defaultTaxPercent: item.taxPercent,
-        defaultTaxMasterId: "",
-      };
-      return calcRow(
-        row,
-        quotation.priceLevelSnapshot?.taxPercent ?? 0,
-        supplierStateCode,
-        placeOfSupplyStateCode
-      );
-    });
-    if (mappedItems.length) {
-      setFieldValue("items", mappedItems);
-    }
-  }, [
-    quotation,
-    setFieldValue,
-    supplierStateCode,
-    placeOfSupplyStateCode,
-  ]);
-
-  // ── When salesType changes → reset customer ───────────────
   useEffect(() => {
     if (prevSalesTypeRef.current === null) {
       prevSalesTypeRef.current = values.salesType;
@@ -631,7 +398,6 @@ export default function SalesInvoiceForm({
     setFieldValue("items", updatedItems);
   }, [supplierStateCode, placeOfSupplyStateCode, setFieldValue]);
 
-  // ── When priceLevel changes → recalc all rows ────────────
   const handlePriceLevelChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const id = e.target.value;
     setFieldValue("priceLevelId", id);
@@ -681,7 +447,6 @@ export default function SalesInvoiceForm({
     setQuickAdd("product");
   };
 
-  // ── Item select ───────────────────────────────────────────
   const applyItemToRow = (index: number, item: any) => {
     const current = valuesRef.current.items[index] ?? emptyRow();
     const priceLevelPct = activePriceLevelPctRef.current;
@@ -711,13 +476,6 @@ export default function SalesInvoiceForm({
       index,
       calcRow(updated, priceLevelPct, supplierStateCode, placeOfSupplyStateCode)
     );
-
-    const available = getAvailableQty(String(item?._id ?? item?.id ?? ""));
-    if (available !== null && available <= 0) {
-      toast.error(
-        `No stock available for ${item?.name || "this item"}. Quantity cannot be added.`
-      );
-    }
   };
 
   const handleItemSelect = async (
@@ -742,25 +500,8 @@ export default function SalesInvoiceForm({
     applyItemToRow(index, item);
   };
 
-  // ── Row field change ──────────────────────────────────────
   const handleQtyChange = (index: number, value: string) => {
     const current = valuesRef.current.items[index] ?? emptyRow();
-    const qtyNum = Number(value) || 0;
-
-    if (qtyNum > 0 && current.itemId) {
-      if (!valuesRef.current.warehouseId) {
-        toast.error("Select a warehouse before entering quantity");
-        return;
-      }
-      const available = getAvailableQty(current.itemId);
-      if (available !== null && available <= 0) {
-        toast.error(
-          `No stock available for ${current.itemName || "this item"}. Quantity cannot be added.`
-        );
-        return;
-      }
-    }
-
     const updated = clearInvoiceRowCalculated({
       ...current,
       qty: value,
@@ -775,7 +516,6 @@ export default function SalesInvoiceForm({
         placeOfSupplyStateCode
       )
     );
-    resetPaymentInputs();
   };
 
   const handleRowChange = (
@@ -929,7 +669,6 @@ export default function SalesInvoiceForm({
   );
   const {
     lineNetAmount,
-    netAmount,
     totalSGST,
     totalCGST,
     totalIGST,
@@ -942,19 +681,12 @@ export default function SalesInvoiceForm({
     hasTax,
   } = totals;
 
-  const paidAmount = resolveReceivedPaidAmount(
-    grandTotal,
-    values.receivedAmount,
-    values.saleMode
-  );
-  const balanceDue = Number((grandTotal - paidAmount).toFixed(2));
-
   return (
     <FormikProvider value={formik}>
       <div className="w-full mx-auto p-5">
         <PageHeader
-          title="New Sales Invoice"
-          description="Create a sales invoice"
+          title="New Quotation"
+          description="Create a sales quotation"
         />
 
         <InvoiceFormKeyboardHints
@@ -964,27 +696,26 @@ export default function SalesInvoiceForm({
 
         <form
           ref={formRef}
-          id={SALES_INVOICE_FORM_ID}
+          id={QUOTATION_FORM_ID}
           onSubmit={handleSubmit}
           onKeyDown={handleFormKeyDown}
           className="space-y-8"
         >
-          {/* ── Invoice Details ─────────────────────────── */}
           <div className="bg-white p-6 rounded-xl shadow-sm">
             <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-5">
-              Invoice Details
+              Quotation Details
             </h3>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-x-16 gap-y-6">
               <NextDocumentNumberField
-                documentType="sales_invoice"
-                label="Invoice No"
+                documentType="quotation"
+                label="Quotation No"
                 params={{ salesType: values.salesType }}
               />
 
               <FormDateInput
-                label="Invoice Date"
-                name="invoiceDate"
-                value={values.invoiceDate}
+                label="Quotation Date"
+                name="quotationDate"
+                value={values.quotationDate}
                 required
                 min={minDate}
                 max={maxDate}
@@ -992,11 +723,21 @@ export default function SalesInvoiceForm({
                 enterNav
                 onChange={handleChange}
                 onBlur={handleBlur}
-                touched={touched.invoiceDate}
-                error={errors.invoiceDate}
+                touched={touched.quotationDate}
+                error={errors.quotationDate}
               />
 
-              {/* Sales Type */}
+              <FormDateInput
+                label="Valid Until"
+                name="validUntil"
+                value={values.validUntil}
+                enterNav
+                onChange={handleChange}
+                onBlur={handleBlur}
+                touched={touched.validUntil}
+                error={errors.validUntil}
+              />
+
               <div>
                 <label className="mb-2 block text-sm font-medium text-gray-700">
                   <span className="text-red-500">* </span>
@@ -1025,7 +766,6 @@ export default function SalesInvoiceForm({
                 )}
               </div>
 
-              {/* Price Level */}
               <FormSelect
                 label="Price Level"
                 name="priceLevelId"
@@ -1042,14 +782,12 @@ export default function SalesInvoiceForm({
                 error={errors.priceLevelId}
               />
 
-              {/* Warehouse */}
               <FormSelectWithAdd
                 label="Warehouse"
-                instanceId="sales-warehouse"
+                instanceId="quotation-warehouse"
                 value={values.warehouseId}
-                required
                 enterNav
-                placeholder="Search warehouse..."
+                placeholder="Search warehouse (optional)..."
                 options={warehouseOptions}
                 onValueChange={(id) => setFieldValue("warehouseId", id)}
                 onBlur={() => setFieldTouched("warehouseId", true)}
@@ -1058,90 +796,9 @@ export default function SalesInvoiceForm({
                 addLabel="Add Warehouse"
                 onAddClick={() => setQuickAdd("warehouse")}
               />
-
-              <div className="md:col-span-2 lg:col-span-3">
-                <label className="mb-2 block text-sm font-medium text-gray-700">
-                  Sale Mode
-                </label>
-                <div className="flex flex-wrap gap-2">
-                  {(["cash", "credit"] as const).map((mode) => (
-                    <button
-                      key={mode}
-                      type="button"
-                      onClick={() => {
-                        setFieldValue("saleMode", mode);
-                        if (mode === "credit") {
-                          setFieldValue("receivedAmount", "");
-                          setFieldValue(
-                            "paymentMethod",
-                            DEFAULT_INVOICE_PAYMENT_MODE
-                          );
-                          setFieldValue("paymentBankAccountId", "");
-                          setPayments([
-                            emptyInvoicePaymentRow(
-                              DEFAULT_INVOICE_PAYMENT_MODE
-                            ),
-                          ]);
-                        } else {
-                          const nextTotals = computeInvoiceTotalsFromItems(
-                            values.items,
-                            values.cashDiscountAmt
-                          );
-                          setFieldValue(
-                            "receivedAmount",
-                            nextTotals.grandTotal > 0
-                              ? String(nextTotals.grandTotal)
-                              : ""
-                          );
-                          setFieldValue(
-                            "paymentMethod",
-                            DEFAULT_INVOICE_PAYMENT_MODE
-                          );
-                          setFieldValue("paymentBankAccountId", "");
-                          setPayments([
-                            emptyInvoicePaymentRow(
-                              DEFAULT_INVOICE_PAYMENT_MODE
-                            ),
-                          ]);
-                        }
-                      }}
-                      className={`rounded-md border px-4 py-2 text-sm font-medium transition ${
-                        values.saleMode === mode
-                          ? "border-black bg-black text-white"
-                          : "border-gray-300 bg-white text-gray-600 hover:bg-gray-50"
-                      }`}
-                    >
-                      {mode === "cash" ? "Cash Sale" : "Credit Sale"}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              <InvoicePaymentMethodSelect
-                name="paymentMethod"
-                value={values.paymentMethod}
-                onChange={(e) => {
-                  handleChange(e);
-                  if (!needsBankAccount(e.target.value)) {
-                    setFieldValue("paymentBankAccountId", "");
-                  }
-                }}
-                onBlur={handleBlur}
-              />
-
-              {needsBankAccount(values.paymentMethod) && (
-                <InvoicePaymentAccountSelect
-                  paymentMode={values.paymentMethod}
-                  name="paymentBankAccountId"
-                  value={values.paymentBankAccountId}
-                  onChange={handleChange}
-                  onBlur={handleBlur}
-                />
-              )}
             </div>
           </div>
 
-          {/* ── Customer Details ─────────────────────────── */}
           <div className="bg-white p-6 rounded-xl shadow-sm">
             <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-5">
               Customer Details
@@ -1157,7 +814,7 @@ export default function SalesInvoiceForm({
               <div className="md:col-span-2">
                 <FormSelectWithAdd
                   label="Customer"
-                  instanceId={`sales-customer-${values.salesType}`}
+                  instanceId={`quotation-customer-${values.salesType}`}
                   reloadKey={values.salesType}
                   value={values.customerId}
                   selectedOption={customerOption}
@@ -1241,7 +898,6 @@ export default function SalesInvoiceForm({
             </div>
           </div>
 
-          {/* ── Items Table ──────────────────────────────── */}
           <div className="bg-white rounded-xl shadow-sm overflow-hidden">
             <div className="p-4 border-b flex justify-between items-center">
               <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-widest">
@@ -1322,27 +978,19 @@ export default function SalesInvoiceForm({
                               `items[${index}]`
                             );
                             const rowErrors = getIn(errors, `items[${index}]`);
-                            const availableQty =
-                              row.itemId && values.warehouseId
-                                ? stockByItemId.get(String(row.itemId)) ?? 0
-                                : null;
-                            const outOfStock =
-                              availableQty !== null && availableQty <= 0;
 
                             return (
                               <tr
                                 key={index}
                                 className="border-t hover:bg-gray-50"
                               >
-                                {/* Sl No */}
                                 <td className="px-3 py-2 text-gray-400 text-xs text-center">
                                   {index + 1}
                                 </td>
 
-                                {/* Item */}
                                 <td className="px-3 py-2">
                                   <ItemSelectWithAdd
-                                    instanceId={`sales-item-${index}`}
+                                    instanceId={`quotation-item-${index}`}
                                     enterNav
                                     value={row.itemId}
                                     selectedOption={
@@ -1368,7 +1016,6 @@ export default function SalesInvoiceForm({
                                   />
                                 </td>
 
-                                {/* HSN — auto from product, readonly */}
                                 <td className="px-3 py-2">
                                   <input
                                     value={row.hsn}
@@ -1380,7 +1027,6 @@ export default function SalesInvoiceForm({
                                   />
                                 </td>
 
-                                {/* UOM — auto, readonly */}
                                 <td className="px-3 py-2">
                                   <input
                                     value={row.uomName}
@@ -1389,7 +1035,6 @@ export default function SalesInvoiceForm({
                                   />
                                 </td>
 
-                                {/* Rate — product sales rate; F2 to edit for this line */}
                                 <td className="px-3 py-2">
                                   {row.rateManual ? (
                                     <input
@@ -1425,7 +1070,6 @@ export default function SalesInvoiceForm({
                                   )}
                                 </td>
 
-                                {/* Qty */}
                                 <td className="px-3 py-2">
                                   <input
                                     type="number"
@@ -1438,19 +1082,11 @@ export default function SalesInvoiceForm({
                                     min="0"
                                     step="0.01"
                                     placeholder="0"
-                                    disabled={outOfStock}
-                                    title={
-                                      outOfStock
-                                        ? "No stock available for this item"
-                                        : undefined
-                                    }
                                     className={`w-full border-b bg-transparent py-1 text-sm text-right outline-none focus:border-blue-600
                                     ${
-                                      outOfStock
-                                        ? "cursor-not-allowed border-gray-200 bg-gray-50 text-gray-400"
-                                        : rowTouched?.qty && rowErrors?.qty
-                                          ? "border-red-500"
-                                          : "border-gray-300"
+                                      rowTouched?.qty && rowErrors?.qty
+                                        ? "border-red-500"
+                                        : "border-gray-300"
                                     }`}
                                   />
                                   {rowTouched?.qty && rowErrors?.qty && (
@@ -1460,7 +1096,6 @@ export default function SalesInvoiceForm({
                                   )}
                                 </td>
 
-                                {/* Discount % */}
                                 <td className="px-3 py-2">
                                   <input
                                     type="number"
@@ -1494,7 +1129,6 @@ export default function SalesInvoiceForm({
                                     )}
                                 </td>
 
-                                {/* GST % — product default; F3 to pick tax master slab */}
                                 <td className="px-3 py-2">
                                   {row.taxManual ? (
                                     <select
@@ -1540,7 +1174,6 @@ export default function SalesInvoiceForm({
                                   )}
                                 </td>
 
-                                {/* Taxable Value — auto */}
                                 <td className="px-3 py-2 text-right text-gray-700">
                                   {row.taxableValue.toFixed(2)}
                                 </td>
@@ -1567,12 +1200,10 @@ export default function SalesInvoiceForm({
                                     </>
                                   ))}
 
-                                {/* Total — auto */}
                                 <td className="px-3 py-2 text-right font-medium text-gray-800">
                                   {row.total.toFixed(2)}
                                 </td>
 
-                                {/* Remove */}
                                 <td className="px-3 py-2">
                                   <button
                                     type="button"
@@ -1590,7 +1221,6 @@ export default function SalesInvoiceForm({
                       </table>
                     </div>
 
-                    {/* Add Row */}
                     <div className="px-4 py-3 border-t">
                       <button
                         type="button"
@@ -1605,15 +1235,7 @@ export default function SalesInvoiceForm({
               }}
             </FieldArray>
 
-            {/* ── Summary ──────────────────────────────────── */}
-            <div className="flex flex-col gap-6 border-t bg-gray-50 p-6 lg:flex-row lg:items-start lg:justify-between">
-              <InvoicePaymentDetailsForm
-                grandTotal={grandTotal}
-                receivedAmount={paidAmount}
-                payments={payments}
-                onPaymentsChange={setPayments}
-                saleMode={values.saleMode}
-              />
+            <div className="flex flex-col gap-6 border-t bg-gray-50 p-6 lg:flex-row lg:items-start lg:justify-end">
               <div className={invoiceSummaryPanelClass}>
                 <div className="flex justify-between text-gray-600 border-t pt-2">
                   <span>Subtotal (Taxable Value)</span>
@@ -1687,40 +1309,6 @@ export default function SalesInvoiceForm({
                   <span>₹ {grandTotal.toFixed(2)}</span>
                 </div>
 
-                <div className="rounded-lg border border-emerald-200 bg-emerald-50/80 px-3 py-2.5">
-                  <div className="flex justify-between items-center gap-3">
-                    <span className="text-sm font-semibold text-emerald-900">
-                      {values.saleMode === "credit"
-                        ? "Advance Received"
-                        : "Received Amount"}
-                    </span>
-                    <input
-                      type="number"
-                      name="receivedAmount"
-                      value={values.receivedAmount}
-                      onChange={handleChange}
-                      onBlur={handleBlur}
-                      onKeyDown={blockNeg}
-                      min="0"
-                      step="0.01"
-                      placeholder="0"
-                      className="w-32 rounded-md border border-emerald-300 bg-white px-2 py-1.5 text-sm font-semibold text-right text-emerald-900 outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-200"
-                    />
-                  </div>
-                  {values.saleMode === "credit" && (
-                    <p className="mt-1 text-xs text-emerald-800">
-                      Leave empty to bill the full amount on credit.
-                    </p>
-                  )}
-                </div>
-
-                {(values.saleMode === "credit" || balanceDue > 0) && (
-                  <div className="flex justify-between text-orange-600 font-medium">
-                    <span>Balance Due</span>
-                    <span>₹ {balanceDue.toFixed(2)}</span>
-                  </div>
-                )}
-
                 <p className="text-gray-400 text-xs italic pt-1">
                   {amountInWords(grandTotal)}
                 </p>
@@ -1728,7 +1316,6 @@ export default function SalesInvoiceForm({
             </div>
           </div>
 
-          {/* ── Notes ────────────────────────────────────── */}
           <div className="bg-white p-6 rounded-xl shadow-sm">
             <FormTextArea
               label="Notes"
