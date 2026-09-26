@@ -7,8 +7,14 @@ import { Trash2, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import PageHeader from "@/app/utilsComponents/PageHeader";
 import { useCreateSalesInvoice } from "@/app/hooks/salesHooks/useSalesInvoice";
-import { useQuotation } from "@/app/hooks/salesHooks/useQuotation";
-import { useWarehouses, useWarehouseStock } from "@/app/hooks/warehouseHooks/useWarehouse";
+import {
+  useQuotation,
+  useQuotations,
+} from "@/app/hooks/salesHooks/useQuotation";
+import {
+  useWarehouses,
+  useWarehouseStock,
+} from "@/app/hooks/warehouseHooks/useWarehouse";
 import { usePriceLevels } from "@/app/hooks/masterHooks/priceLevelHook/usePriceLevel";
 import { useTaxMasters } from "@/app/hooks/masterHooks/taxMasterHook/useTaxMaster";
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
@@ -20,7 +26,7 @@ import {
 } from "@/app/formComponents/masterLoadOptions";
 import { itemService } from "@/app/services/masterServices/item/item.service";
 import { toOption, type SelectOption } from "@/app/formComponents/selectTypes";
-import { SalesItemRow } from "@/app/types";
+import { Quotation, SalesItemRow } from "@/app/types";
 import { useBranchStore } from "@/app/store/branch/branch.store";
 import { SALES_INVOICE_FORM_ID } from "@/app/utilsComponents/form-footer";
 import FormSelect from "@/app/formComponents/FormSelect";
@@ -73,6 +79,7 @@ import {
 import {
   DEFAULT_INVOICE_PAYMENT_MODE,
   needsBankAccount,
+  resolveCustomerName,
 } from "@/app/utilsComponents/paymentConstants";
 
 // ── Block negative keys ───────────────────────────────────────
@@ -164,9 +171,10 @@ export default function SalesInvoiceForm({
 }) {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const quotationId = searchParams.get("quotationId") ?? "";
-  const { data: quotation } = useQuotation(quotationId);
-  const quotationPrefilledRef = useRef(false);
+  const presetQuotationId = searchParams.get("quotationId") ?? "";
+  const [selectedQuotationId, setSelectedQuotationId] =
+    useState(presetQuotationId);
+  const lastAppliedQuotationIdRef = useRef("");
   const prevSalesTypeRef = useRef<string | null>(null);
   const { mutate: create, isPending } = useCreateSalesInvoice();
 
@@ -183,6 +191,11 @@ export default function SalesInvoiceForm({
   });
   const { data: warehouseData } = useWarehouses({ limit: FORM_LOOKUP_LIMIT });
   const { data: companySettings } = useCompanySettings();
+  const { data: quotationsListData } = useQuotations({
+    page: 1,
+    limit: FORM_LOOKUP_LIMIT,
+  });
+  const { data: selectedQuotation } = useQuotation(selectedQuotationId);
 
   const priceLevels = priceLevelData?.data ?? [];
   const taxMasterOptions = useMemo(
@@ -398,7 +411,7 @@ export default function SalesInvoiceForm({
           igst: r.igst ?? 0,
           total: r.total,
         })),
-        ...(quotationId ? { quotationId } : {}),
+        ...(selectedQuotationId ? { quotationId: selectedQuotationId } : {}),
       };
       create(payload, { onSuccess: redirectToSalesList });
     },
@@ -478,6 +491,121 @@ export default function SalesInvoiceForm({
     [values.salesType]
   );
 
+  const quotationSelectOptions = useMemo(() => {
+    return (quotationsListData?.data ?? [])
+      .filter((q) => q.status !== "converted" && q.status !== "cancelled")
+      .map((q) => ({
+        value: q._id,
+        label: `${q.quotationNo} · ${resolveCustomerName(
+          q
+        )} · ₹ ${q.grandTotal.toFixed(2)}`,
+      }));
+  }, [quotationsListData]);
+
+  const applyQuotationToForm = useCallback(
+    (quotation: Quotation) => {
+      prevSalesTypeRef.current = quotation.salesType;
+      setFieldValue("salesType", quotation.salesType);
+
+      const priceLevelId =
+        typeof quotation.priceLevelId === "object"
+          ? quotation.priceLevelId?._id
+          : quotation.priceLevelId ?? "";
+      if (priceLevelId) {
+        setFieldValue("priceLevelId", priceLevelId);
+        setActivePriceLevelPct(quotation.priceLevelSnapshot?.taxPercent ?? 0);
+      }
+
+      const customerId =
+        typeof quotation.customerId === "object"
+          ? quotation.customerId._id
+          : quotation.customerId;
+      if (customerId) {
+        setFieldValue("customerId", customerId);
+        const snap = quotation.customerSnapshot;
+        const custName =
+          snap?.name ||
+          (typeof quotation.customerId === "object"
+            ? quotation.customerId.name
+            : "");
+        setCustomerOption(toOption(customerId, custName, quotation.customerId));
+        setCustomerDetails({
+          gstin: snap?.gstin || "",
+          place: snap?.place || "",
+          state: snap?.state || "",
+          stateCode: snap?.stateCode || "",
+          address: snap?.address || "",
+        });
+      }
+
+      const warehouseId =
+        typeof quotation.warehouseId === "object"
+          ? quotation.warehouseId?._id
+          : quotation.warehouseId ?? "";
+      if (warehouseId) {
+        setFieldValue("warehouseId", warehouseId);
+      }
+
+      setFieldValue("notes", quotation.notes || "");
+
+      setFieldValue("cashDiscountAmt", String(quotation.cashDiscountAmt ?? 0));
+
+      const posState =
+        normalizeStateCode(quotation.customerSnapshot?.stateCode) ||
+        stateCodeFromGstin(quotation.customerSnapshot?.gstin) ||
+        placeOfSupplyStateCode;
+
+      const mappedItems = quotation.items.map((item, index) => {
+        const row: SalesItemRow = {
+          slNo: item.slNo ?? index + 1,
+          itemId:
+            typeof item.itemId === "object" ? item.itemId._id : item.itemId,
+          itemName: typeof item.itemId === "object" ? item.itemId.name : "",
+          hsn: item.hsn || "",
+          uomId: typeof item.uomId === "object" ? item.uomId._id : item.uomId,
+          uomName:
+            typeof item.uomId === "object"
+              ? `${item.uomId.name} (${item.uomId.shortCode})`
+              : "",
+          baseRate: item.baseRate,
+          priceLevelPct: item.priceLevelPct ?? 0,
+          rate: item.rate,
+          qty: String(item.qty),
+          discount: String(item.discount ?? 0),
+          discountAmt: item.discountAmt ?? 0,
+          taxableValue: item.taxableValue,
+          taxPercent: item.taxPercent,
+          sgst: item.sgst,
+          cgst: item.cgst,
+          igst: item.igst ?? 0,
+          total: item.total,
+          rateManual: false,
+          taxManual: false,
+          taxMasterId: "",
+          defaultTaxPercent: item.taxPercent,
+          defaultTaxMasterId: "",
+        };
+        return calcRow(
+          row,
+          quotation.priceLevelSnapshot?.taxPercent ?? 0,
+          supplierStateCode,
+          posState
+        );
+      });
+      if (mappedItems.length) {
+        setFieldValue("items", mappedItems);
+      }
+    },
+    [setFieldValue, supplierStateCode, placeOfSupplyStateCode]
+  );
+
+  useEffect(() => {
+    if (presetQuotationId) {
+      setSelectedQuotationId(presetQuotationId);
+      lastAppliedQuotationIdRef.current = "";
+    }
+  }, [presetQuotationId]);
+
   useEffect(() => {
     if (!allowPastDates && values.invoiceDate !== today) {
       setFieldValue("invoiceDate", today);
@@ -485,119 +613,23 @@ export default function SalesInvoiceForm({
   }, [allowPastDates, today, values.invoiceDate, setFieldValue]);
 
   useEffect(() => {
-    if (quotationId) return;
+    if (selectedQuotationId) return;
     const defaultType = companySettings?.defaultSalesType;
     if (!defaultType) return;
     setFieldValue("salesType", defaultType);
   }, [
-    quotationId,
+    selectedQuotationId,
     companySettings?._id,
     companySettings?.defaultSalesType,
     setFieldValue,
   ]);
 
   useEffect(() => {
-    if (!quotation || quotationPrefilledRef.current) return;
-    quotationPrefilledRef.current = true;
-
-    setFieldValue("salesType", quotation.salesType);
-    prevSalesTypeRef.current = quotation.salesType;
-
-    const priceLevelId =
-      typeof quotation.priceLevelId === "object"
-        ? quotation.priceLevelId?._id
-        : quotation.priceLevelId ?? "";
-    if (priceLevelId) {
-      setFieldValue("priceLevelId", priceLevelId);
-      setActivePriceLevelPct(quotation.priceLevelSnapshot?.taxPercent ?? 0);
-    }
-
-    const customerId =
-      typeof quotation.customerId === "object"
-        ? quotation.customerId._id
-        : quotation.customerId;
-    if (customerId) {
-      setFieldValue("customerId", customerId);
-      const snap = quotation.customerSnapshot;
-      const custName =
-        snap?.name ||
-        (typeof quotation.customerId === "object"
-          ? quotation.customerId.name
-          : "");
-      setCustomerOption(toOption(customerId, custName, quotation.customerId));
-      setCustomerDetails({
-        gstin: snap?.gstin || "",
-        place: snap?.place || "",
-        state: snap?.state || "",
-        stateCode: snap?.stateCode || "",
-        address: snap?.address || "",
-      });
-    }
-
-    const warehouseId =
-      typeof quotation.warehouseId === "object"
-        ? quotation.warehouseId?._id
-        : quotation.warehouseId ?? "";
-    if (warehouseId) {
-      setFieldValue("warehouseId", warehouseId);
-    }
-
-    if (quotation.notes) {
-      setFieldValue("notes", quotation.notes);
-    }
-
-    setFieldValue(
-      "cashDiscountAmt",
-      String(quotation.cashDiscountAmt ?? 0)
-    );
-
-    const mappedItems = quotation.items.map((item: any, index: number) => {
-      const row: SalesItemRow = {
-        slNo: item.slNo ?? index + 1,
-        itemId:
-          typeof item.itemId === "object" ? item.itemId._id : item.itemId,
-        itemName:
-          typeof item.itemId === "object" ? item.itemId.name : "",
-        hsn: item.hsn || "",
-        uomId: typeof item.uomId === "object" ? item.uomId._id : item.uomId,
-        uomName:
-          typeof item.uomId === "object"
-            ? `${item.uomId.name} (${item.uomId.shortCode})`
-            : "",
-        baseRate: item.baseRate,
-        priceLevelPct: item.priceLevelPct ?? 0,
-        rate: item.rate,
-        qty: String(item.qty),
-        discount: String(item.discount ?? 0),
-        discountAmt: item.discountAmt ?? 0,
-        taxableValue: item.taxableValue,
-        taxPercent: item.taxPercent,
-        sgst: item.sgst,
-        cgst: item.cgst,
-        igst: item.igst ?? 0,
-        total: item.total,
-        rateManual: false,
-        taxManual: false,
-        taxMasterId: "",
-        defaultTaxPercent: item.taxPercent,
-        defaultTaxMasterId: "",
-      };
-      return calcRow(
-        row,
-        quotation.priceLevelSnapshot?.taxPercent ?? 0,
-        supplierStateCode,
-        placeOfSupplyStateCode
-      );
-    });
-    if (mappedItems.length) {
-      setFieldValue("items", mappedItems);
-    }
-  }, [
-    quotation,
-    setFieldValue,
-    supplierStateCode,
-    placeOfSupplyStateCode,
-  ]);
+    if (!selectedQuotation || !selectedQuotationId) return;
+    if (lastAppliedQuotationIdRef.current === selectedQuotationId) return;
+    lastAppliedQuotationIdRef.current = selectedQuotationId;
+    applyQuotationToForm(selectedQuotation);
+  }, [selectedQuotation, selectedQuotationId, applyQuotationToForm]);
 
   // ── When salesType changes → reset customer ───────────────
   useEffect(() => {
@@ -715,7 +747,9 @@ export default function SalesInvoiceForm({
     const available = getAvailableQty(String(item?._id ?? item?.id ?? ""));
     if (available !== null && available <= 0) {
       toast.error(
-        `No stock available for ${item?.name || "this item"}. Quantity cannot be added.`
+        `No stock available for ${
+          item?.name || "this item"
+        }. Quantity cannot be added.`
       );
     }
   };
@@ -755,7 +789,9 @@ export default function SalesInvoiceForm({
       const available = getAvailableQty(current.itemId);
       if (available !== null && available <= 0) {
         toast.error(
-          `No stock available for ${current.itemName || "this item"}. Quantity cannot be added.`
+          `No stock available for ${
+            current.itemName || "this item"
+          }. Quantity cannot be added.`
         );
         return;
       }
@@ -778,11 +814,7 @@ export default function SalesInvoiceForm({
     resetPaymentInputs();
   };
 
-  const handleRowChange = (
-    index: number,
-    field: "discount",
-    value: string
-  ) => {
+  const handleRowChange = (index: number, field: "discount", value: string) => {
     const current = valuesRef.current.items[index] ?? emptyRow();
     const updated = clearInvoiceRowCalculated({ ...current, [field]: value });
     updateRow(
@@ -1059,85 +1091,106 @@ export default function SalesInvoiceForm({
                 onAddClick={() => setQuickAdd("warehouse")}
               />
 
-              <div className="md:col-span-2 lg:col-span-3">
-                <label className="mb-2 block text-sm font-medium text-gray-700">
-                  Sale Mode
-                </label>
-                <div className="flex flex-wrap gap-2">
-                  {(["cash", "credit"] as const).map((mode) => (
-                    <button
-                      key={mode}
-                      type="button"
-                      onClick={() => {
-                        setFieldValue("saleMode", mode);
-                        if (mode === "credit") {
-                          setFieldValue("receivedAmount", "");
-                          setFieldValue(
-                            "paymentMethod",
-                            DEFAULT_INVOICE_PAYMENT_MODE
-                          );
-                          setFieldValue("paymentBankAccountId", "");
-                          setPayments([
-                            emptyInvoicePaymentRow(
-                              DEFAULT_INVOICE_PAYMENT_MODE
-                            ),
-                          ]);
-                        } else {
-                          const nextTotals = computeInvoiceTotalsFromItems(
-                            values.items,
-                            values.cashDiscountAmt
-                          );
-                          setFieldValue(
-                            "receivedAmount",
-                            nextTotals.grandTotal > 0
-                              ? String(nextTotals.grandTotal)
-                              : ""
-                          );
-                          setFieldValue(
-                            "paymentMethod",
-                            DEFAULT_INVOICE_PAYMENT_MODE
-                          );
-                          setFieldValue("paymentBankAccountId", "");
-                          setPayments([
-                            emptyInvoicePaymentRow(
-                              DEFAULT_INVOICE_PAYMENT_MODE
-                            ),
-                          ]);
-                        }
-                      }}
-                      className={`rounded-md border px-4 py-2 text-sm font-medium transition ${
-                        values.saleMode === mode
-                          ? "border-black bg-black text-white"
-                          : "border-gray-300 bg-white text-gray-600 hover:bg-gray-50"
-                      }`}
-                    >
-                      {mode === "cash" ? "Cash Sale" : "Credit Sale"}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              <InvoicePaymentMethodSelect
-                name="paymentMethod"
-                value={values.paymentMethod}
+              <FormSelect
+                label="Quotation"
+                name="selectedQuotationId"
+                value={selectedQuotationId}
+                enterNav
+                disabled={!!presetQuotationId}
+                placeholder="Load from quotation (optional)"
+                options={quotationSelectOptions}
                 onChange={(e) => {
-                  handleChange(e);
-                  if (!needsBankAccount(e.target.value)) {
-                    setFieldValue("paymentBankAccountId", "");
-                  }
+                  lastAppliedQuotationIdRef.current = "";
+                  setSelectedQuotationId(e.target.value);
                 }}
-                onBlur={handleBlur}
+                onBlur={() => {}}
               />
 
-              {needsBankAccount(values.paymentMethod) && (
-                <InvoicePaymentAccountSelect
-                  paymentMode={values.paymentMethod}
-                  name="paymentBankAccountId"
-                  value={values.paymentBankAccountId}
-                  onChange={handleChange}
-                  onBlur={handleBlur}
-                />
-              )}
+              <div className="md:col-span-2 lg:col-span-3 flex flex-col gap-6 sm:flex-row sm:flex-wrap sm:items-end sm:gap-x-16">
+                <div>
+                  <label className="mb-2 block text-sm font-medium text-gray-700">
+                    Sale Mode
+                  </label>
+                  <div className="flex flex-wrap gap-2">
+                    {(["cash", "credit"] as const).map((mode) => (
+                      <button
+                        key={mode}
+                        type="button"
+                        onClick={() => {
+                          setFieldValue("saleMode", mode);
+                          if (mode === "credit") {
+                            setFieldValue("receivedAmount", "");
+                            setFieldValue(
+                              "paymentMethod",
+                              DEFAULT_INVOICE_PAYMENT_MODE
+                            );
+                            setFieldValue("paymentBankAccountId", "");
+                            setPayments([
+                              emptyInvoicePaymentRow(
+                                DEFAULT_INVOICE_PAYMENT_MODE
+                              ),
+                            ]);
+                          } else {
+                            const nextTotals = computeInvoiceTotalsFromItems(
+                              values.items,
+                              values.cashDiscountAmt
+                            );
+                            setFieldValue(
+                              "receivedAmount",
+                              nextTotals.grandTotal > 0
+                                ? String(nextTotals.grandTotal)
+                                : ""
+                            );
+                            setFieldValue(
+                              "paymentMethod",
+                              DEFAULT_INVOICE_PAYMENT_MODE
+                            );
+                            setFieldValue("paymentBankAccountId", "");
+                            setPayments([
+                              emptyInvoicePaymentRow(
+                                DEFAULT_INVOICE_PAYMENT_MODE
+                              ),
+                            ]);
+                          }
+                        }}
+                        className={`rounded-md border px-4 py-2 text-sm font-medium transition ${
+                          values.saleMode === mode
+                            ? "border-black bg-black text-white"
+                            : "border-gray-300 bg-white text-gray-600 hover:bg-gray-50"
+                        }`}
+                      >
+                        {mode === "cash" ? "Cash Sale" : "Credit Sale"}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="min-w-[200px] flex-1 sm:max-w-xs">
+                  <InvoicePaymentMethodSelect
+                    name="paymentMethod"
+                    value={values.paymentMethod}
+                    onChange={(e) => {
+                      handleChange(e);
+                      if (!needsBankAccount(e.target.value)) {
+                        setFieldValue("paymentBankAccountId", "");
+                      }
+                    }}
+                    onBlur={handleBlur}
+                  />
+                </div>
+
+                {needsBankAccount(values.paymentMethod) && (
+                  <div className="min-w-[200px] flex-1 sm:max-w-xs">
+                    <InvoicePaymentAccountSelect
+                      paymentMode={values.paymentMethod}
+                      name="paymentBankAccountId"
+                      value={values.paymentBankAccountId}
+                      onChange={handleChange}
+                      onBlur={handleBlur}
+                    />
+                  </div>
+                )}
+              </div>
             </div>
           </div>
 
@@ -1449,8 +1502,8 @@ export default function SalesInvoiceForm({
                                       outOfStock
                                         ? "cursor-not-allowed border-gray-200 bg-gray-50 text-gray-400"
                                         : rowTouched?.qty && rowErrors?.qty
-                                          ? "border-red-500"
-                                          : "border-gray-300"
+                                        ? "border-red-500"
+                                        : "border-gray-300"
                                     }`}
                                   />
                                   {rowTouched?.qty && rowErrors?.qty && (
